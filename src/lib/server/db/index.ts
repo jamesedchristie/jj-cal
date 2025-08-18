@@ -1,15 +1,19 @@
-import { dev } from '$app/environment';
-import { DATABASE_AUTH_TOKEN, DATABASE_URL } from '$env/static/private';
 import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
+import { drizzle as drizzleLibSql } from 'drizzle-orm/libsql';
 import * as schema from './schema';
 
-if (!DATABASE_URL) throw new Error('DATABASE_URL is not set in index.ts');
-if (!dev && !DATABASE_AUTH_TOKEN) throw new Error('DATABASE_AUTH_TOKEN is not set');
+export function getDb(db?: D1Database, databaseUrl?: string) {
+	if (db) {
+		return drizzleD1(db, { schema });
+	}
 
-const client = createClient({
-	url: DATABASE_URL,
-	authToken: DATABASE_AUTH_TOKEN
-});
+	if (databaseUrl) {
+		const client = createClient({ url: databaseUrl });
+		return drizzleLibSql(client, { schema });
+	}
 
-export const db = drizzle(client, { schema });
+	throw new Error('No database configuration found');
+}
+
+export type DrizzleClient = ReturnType<typeof getDb>;

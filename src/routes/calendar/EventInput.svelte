@@ -1,42 +1,19 @@
 <script lang="ts">
 	interface Props {
 		event?: { text: string; created_by_name: string };
-		oncreate?: (text: string) => Promise<boolean>;
-		onedit?: (text: string) => Promise<boolean>;
+		onedit: () => void;
 	}
 
-	let { event, oncreate, onedit }: Props = $props();
-
-	let showInput = $state(false);
-	let text = $derived.by(() => {
-		const value = $state(event?.text ?? '');
-		return { value };
-	});
-
-	function onsubmit(e: SubmitEvent) {
-		e.preventDefault();
-		if (event) {
-			onedit?.(text.value);
-		} else {
-			oncreate?.(text.value);
-			text.value = '';
-		}
-		showInput = false;
-	}
+	let { event, onedit }: Props = $props();
 </script>
 
-{#if showInput}
-	<form class="new-event" {onsubmit}>
-		<input type="text" placeholder="Add event..." bind:value={text.value} />
-		<button type="submit">Save</button>
-	</form>
-{:else if event}
+{#if event}
 	<div class="event">
 		<span class="event-text">[{event.created_by_name}] {event.text}</span>
-		<button type="button" class="edit-event" onclick={() => (showInput = true)}> Edit </button>
+		<button type="button" class="edit-event" onclick={onedit}> Edit </button>
 	</div>
 {:else}
-	<button type="button" class="add-event" onclick={() => (showInput = true)}> + </button>
+	<button type="button" class="add-event" onclick={onedit}> + </button>
 {/if}
 
 <style>
@@ -44,6 +21,14 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		font-size: 12px;
+		padding: 2px;
+		background-color: rgba(0, 0, 0, 0.05);
+		border-radius: 4px;
+		border: 1px solid lightgray;
+		& button {
+			font-size: 10px;
+		}
 	}
 	button.add-event {
 		width: 100%;

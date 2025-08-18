@@ -6,9 +6,8 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set in confi
 
 export default defineConfig({
 	schema: './src/lib/server/db/schema.ts',
-	dialect: 'turso',
+	dialect: 'sqlite',
 	dbCredentials: {
-		authToken: process.env.DATABASE_AUTH_TOKEN,
 		url: process.env.DATABASE_URL
 	},
 	verbose: true,

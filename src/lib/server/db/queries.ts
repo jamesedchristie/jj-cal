@@ -1,23 +1,23 @@
 import { and, eq, gt, lt } from 'drizzle-orm';
-import { db } from '.';
+import { type DrizzleClient } from '.';
 import { eventsTable, usersTable } from './schema';
 
-export async function getUserByName(name: string) {
+export async function getUserByName(db: DrizzleClient, name: string) {
 	const user = await db.select().from(usersTable).where(eq(usersTable.name, name));
 	return user[0] ?? null;
 }
 
-export async function getUserByToken(token: string) {
+export async function getUserByToken(db: DrizzleClient, token: string) {
 	const user = await db.select().from(usersTable).where(eq(usersTable.token, token));
 	return user[0] ?? null;
 }
 
-export async function createUser(name: string) {
+export async function createUser(db: DrizzleClient, name: string) {
 	const user = await db.insert(usersTable).values({ name }).returning();
 	return user[0];
 }
 
-export async function setUserToken(user_id: number, token: string) {
+export async function setUserToken(db: DrizzleClient, user_id: number, token: string) {
 	const user = await db
 		.update(usersTable)
 		.set({ token })
@@ -26,9 +26,12 @@ export async function setUserToken(user_id: number, token: string) {
 	return user[0];
 }
 
-export async function createEvent(input: { datetime: number; text: string; name: string }) {
+export async function createEvent(
+	db: DrizzleClient,
+	input: { datetime: number; text: string; name: string }
+) {
 	const { datetime, text, name } = input;
-	const user = await getUserByName(name);
+	const user = await getUserByName(db, name);
 	if (!user) throw 'User not found';
 	const event = await db
 		.insert(eventsTable)
@@ -42,7 +45,7 @@ export async function createEvent(input: { datetime: number; text: string; name:
 	return event[0];
 }
 
-export async function updateEventText(id: number, text: string) {
+export async function updateEventText(db: DrizzleClient, id: number, text: string) {
 	const event = await db
 		.update(eventsTable)
 		.set({ text })
@@ -51,7 +54,12 @@ export async function updateEventText(id: number, text: string) {
 	return event[0];
 }
 
-export async function getEventsForMonth(year: number, month: number) {
+export async function deleteEvent(db: DrizzleClient, id: number) {
+	await db.delete(eventsTable).where(eq(eventsTable.id, id));
+	return true;
+}
+
+export async function getEventsForMonth(db: DrizzleClient, year: number, month: number) {
 	const startOfMonth = new Date(year, month - 1, 1).getTime();
 	const endOfMonth = new Date(year, month, 1).getTime();
 	const events = await db

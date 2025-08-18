@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
-	import { addEventToDate, editEvent, loadEvents } from './data.remote';
+	import { addEventToDate, editEvent, loadEvents, removeEvent } from './data.remote';
 	import EventInput from './EventInput.svelte';
 
 	interface Props {
@@ -36,8 +36,6 @@
 		return `/calendar?year=${date.getFullYear()}&month=${date.getMonth() + 1}`;
 	});
 
-	let selectedDate = $state<number | null>(null);
-
 	let monthWeeks = $derived.by(() => {
 		const weeks: Date[][] = [];
 		let first = new Date(year, month - 1, 1);
@@ -61,6 +59,37 @@
 	});
 
 	let monthEvents = $derived(await loadEvents({ year, month }));
+	let selectedDate = $state<Date | null>(null);
+	let selectedEvent = $state<(typeof monthEvents)[number] | null>(null);
+	let editingText = $state('');
+
+	let dialog = $state<HTMLDialogElement>();
+
+	function onEventEdit(date: Date, event: typeof selectedEvent = null) {
+		selectedDate = date;
+		selectedEvent = event;
+		editingText = event?.text ?? '';
+		toggleDialog();
+	}
+
+	function toggleDialog() {
+		if (dialog) {
+			if (dialog.open) dialog.requestClose();
+			else dialog.showModal();
+		}
+	}
+
+	function onsubmit(e: SubmitEvent) {
+		e.preventDefault();
+		if (!selectedDate) return;
+		if (selectedEvent) {
+			if (editingText) editEventText(selectedEvent, editingText);
+			else deleteEvent(selectedEvent);
+		} else {
+			createEvent(selectedDate, editingText);
+		}
+		toggleDialog();
+	}
 
 	function isSameDay(datetime: number, date: Date) {
 		const eventDate = new Date(datetime);
@@ -80,9 +109,13 @@
 			created_by_name: user?.name ?? '',
 			created_by_id: user?.id ?? 1
 		};
-		await addEventToDate({ year, month, date, text, name: user.name }).updates(
-			loadEvents({ year, month }).withOverride((events) => [...events, newEvent])
-		);
+		await addEventToDate({
+			year: date.getFullYear(),
+			month: date.getMonth() + 1,
+			date: date.getDate(),
+			text,
+			name: user.name
+		}).updates(loadEvents({ year, month }).withOverride((events) => [...events, newEvent]));
 		return true;
 	}
 
@@ -94,6 +127,12 @@
 			)
 		);
 		return true;
+	}
+
+	async function deleteEvent(event: (typeof monthEvents)[number]) {
+		await removeEvent({ id: event.id }).updates(
+			loadEvents({ year, month }).withOverride((events) => events.filter((e) => e.id !== event.id))
+		);
 	}
 </script>
 
@@ -127,15 +166,21 @@
 					<tr>
 						{#each week as date}
 							{@const events = monthEvents.filter((event) => isSameDay(event.datetime, date))}
-							<td class={{ day: true, selected: date.getDate() === selectedDate }}>
+							<td
+								class={{
+									day: true,
+									selected: selectedDate && date.getDate() === selectedDate.getDate()
+								}}
+								style:height="{Math.floor(100 / monthWeeks.length)}%"
+							>
 								<div class="date-label">
 									{date.getDate()}
 								</div>
 								<div class="date-content">
 									{#each events as event}
-										<EventInput {event} onedit={(text) => editEventText(event, text)} />
+										<EventInput {event} onedit={() => onEventEdit(date, event)} />
 									{/each}
-									<EventInput oncreate={(text) => createEvent(date, text)} />
+									<EventInput onedit={() => onEventEdit(date)} />
 								</div>
 							</td>
 						{/each}
@@ -145,6 +190,21 @@
 		</table>
 	</section>
 </div>
+
+<dialog bind:this={dialog}>
+	<form {onsubmit}>
+		<div class="text-input">
+			<label>
+				{selectedEvent ? 'Edit' : 'Create'} Event
+				<textarea bind:value={editingText}></textarea>
+			</label>
+		</div>
+		<div class="actions">
+			<button type="button" onclick={toggleDialog}>Close</button>
+			<button>{selectedEvent ? (editingText ? 'Save' : 'Remove Event') : 'Create'}</button>
+		</div>
+	</form>
+</dialog>
 
 <style>
 	.calendar-wrapper {
@@ -164,13 +224,12 @@
 			overflow-y: auto;
 			& table {
 				width: 100%;
+				height: 100%;
 				border-collapse: collapse;
 				& .day {
 					position: relative;
 					border: 1px solid black;
 					width: 14%;
-					height: calc(80dvh / var(--numWeeks));
-					padding: 5px;
 					& .date-label {
 						position: absolute;
 						top: 0;
@@ -179,7 +238,29 @@
 						text-align: center;
 						font-weight: bold;
 					}
+					& .date-content {
+						min-height: 80px;
+						padding: 5px;
+						display: flex;
+						flex-direction: column;
+						justify-content: center;
+						gap: 5px;
+					}
 				}
+			}
+		}
+	}
+	dialog {
+		& form {
+			display: flex;
+			flex-direction: column;
+			& label {
+				display: flex;
+				flex-direction: column;
+			}
+			& .actions {
+				display: flex;
+				justify-content: space-between;
 			}
 		}
 	}
