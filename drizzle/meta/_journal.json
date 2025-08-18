@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1755498034523,
+      "tag": "0000_funny_dust",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1755498922395,
+      "tag": "0001_lush_jetstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1755499231129,
+      "tag": "0002_abandoned_rockslide",
+      "breakpoints": true
+    }
+  ]
+}
