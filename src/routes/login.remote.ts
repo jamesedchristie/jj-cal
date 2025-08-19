@@ -23,3 +23,9 @@ export const login = form(async (formData) => {
 		return fail(422, { message: 'Invalid credentials' });
 	}
 });
+
+export const logout = form(async () => {
+	const { cookies } = getRequestEvent();
+	cookies.delete('token', { path: '/' });
+	redirect(303, '/');
+});

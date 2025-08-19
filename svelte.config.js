@@ -9,7 +9,10 @@ const config = {
 	compilerOptions: {
 		experimental: { async: true }
 	},
-	kit: { adapter: adapter(), experimental: { remoteFunctions: true } }
+	kit: { adapter: adapter(), experimental: { remoteFunctions: true } },
+	vitePlugin: {
+		inspector: true
+	}
 };
 
 export default config;
