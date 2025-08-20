@@ -166,17 +166,6 @@
 	<section class="heading">
 		<h2>{calendar.name}</h2>
 	</section>
-	<section class="controls">
-		<div class="controls-left">
-			<Button href={prevMonthHref}>&lt;</Button>
-		</div>
-		<div class="controls-center">
-			<h3>{monthName} {year}</h3>
-		</div>
-		<div class="controls-right">
-			<Button href={nextMonthHref}>&gt;</Button>
-		</div>
-	</section>
 	<section class={{ calendar: true }} style:--numWeeks={monthWeeks.length}>
 		<table>
 			<thead>
@@ -225,6 +214,17 @@
 				{/each}
 			</tbody>
 		</table>
+	</section>
+	<section class="controls">
+		<div class="controls-left">
+			<Button href={prevMonthHref}>&lt;</Button>
+		</div>
+		<div class="controls-center">
+			<h3>{monthName} {year}</h3>
+		</div>
+		<div class="controls-right">
+			<Button href={nextMonthHref}>&gt;</Button>
+		</div>
 	</section>
 </div>
 
@@ -291,28 +291,14 @@
 		& section.heading {
 			display: flex;
 			justify-content: center;
+			padding: 0 1rem 1rem;
 			& h2 {
 				font-size: 1.2rem;
-			}
-		}
-		& section.controls {
-			flex: none;
-			width: 100%;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			padding: 1rem;
-			gap: 2rem;
-			& .controls-center {
-				& h3 {
-					font-size: 1.5rem;
-				}
 			}
 		}
 		& .calendar {
 			flex: auto;
 			overflow-y: auto;
-			padding-bottom: 1rem;
 			& table {
 				width: 100%;
 				height: 100%;
@@ -375,6 +361,22 @@
 							}
 						}
 					}
+				}
+			}
+		}
+		& section.controls {
+			flex: none;
+			width: 100%;
+			display: flex;
+			max-width: 400px;
+			justify-content: space-between;
+			align-items: center;
+			padding: 1rem;
+			margin: 0 auto;
+			gap: 2rem;
+			& .controls-center {
+				& h3 {
+					font-size: 1.5rem;
 				}
 			}
 		}

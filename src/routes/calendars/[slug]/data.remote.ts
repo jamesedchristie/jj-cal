@@ -6,12 +6,13 @@ import {
 	getEventsForMonth,
 	updateEventText
 } from '$lib/server/db/queries';
+import { error } from '@sveltejs/kit';
 import { Temporal } from 'temporal-polyfill';
 
 export const loadCalendar = query('unchecked', async (slug: string) => {
 	const { locals } = getRequestEvent();
 	const calendar = await getCalendarBySlug(locals.db, slug);
-	if (!calendar) throw 'Calendar not found';
+	if (!calendar) error(404, 'Calendar not found');
 	return calendar;
 });
 
