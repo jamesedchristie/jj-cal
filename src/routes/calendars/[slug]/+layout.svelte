@@ -10,7 +10,16 @@
 
 <svelte:boundary>
 	{#snippet pending()}
-		Loading...
+		<div>Loading...</div>
 	{/snippet}
 	{@render children?.()}
 </svelte:boundary>
+
+<style>
+	div {
+		height: 100%;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+</style>

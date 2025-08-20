@@ -163,18 +163,21 @@
 </script>
 
 <div class="calendar-wrapper">
+	<section class="heading">
+		<h2>{calendar.name}</h2>
+	</section>
 	<section class="controls">
 		<div class="controls-left">
 			<Button href={prevMonthHref}>&lt;</Button>
 		</div>
 		<div class="controls-center">
-			<h2><span>{calendar.name}</span> <span>{monthName} {year}</span></h2>
+			<h3>{monthName} {year}</h3>
 		</div>
 		<div class="controls-right">
 			<Button href={nextMonthHref}>&gt;</Button>
 		</div>
 	</section>
-	<section class="calendar" style:--numWeeks={monthWeeks.length}>
+	<section class={{ calendar: true }} style:--numWeeks={monthWeeks.length}>
 		<table>
 			<thead>
 				<tr>
@@ -195,6 +198,7 @@
 							<td
 								class={{
 									day: true,
+									differentMonth: date.getMonth() + 1 !== month,
 									selected: selectedDate && date.getDate() === selectedDate.getDate()
 								}}
 								style:height="{Math.floor(100 / monthWeeks.length)}%"
@@ -284,27 +288,31 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		& .controls {
+		& section.heading {
+			display: flex;
+			justify-content: center;
+			& h2 {
+				font-size: 1.2rem;
+			}
+		}
+		& section.controls {
 			flex: none;
 			width: 100%;
 			display: flex;
-			justify-content: space-between;
-			align-items: flex-end;
+			justify-content: center;
+			align-items: center;
 			padding: 1rem;
+			gap: 2rem;
 			& .controls-center {
-				& h2 {
-					display: flex;
-					flex-direction: column;
-					flex-wrap: wrap;
-					justify-content: center;
-					align-items: center;
-					gap: 0.5rem;
+				& h3 {
+					font-size: 1.5rem;
 				}
 			}
 		}
 		& .calendar {
 			flex: auto;
 			overflow-y: auto;
+			padding-bottom: 1rem;
 			& table {
 				width: 100%;
 				height: 100%;
@@ -333,7 +341,6 @@
 							display: flex;
 							justify-content: flex-end;
 							padding: 2px;
-							color: gray;
 							font-size: 14px;
 						}
 						& button {
@@ -348,13 +355,23 @@
 							font-size: 10px;
 							cursor: pointer;
 							&:hover {
-								background-color: rgba(0, 0, 0, 0.05);
+								background-color: rgba(0, 0, 0, 0.1);
 							}
 							& ul {
 								display: flex;
 								flex-direction: column;
 								justify-content: center;
 								gap: 5px;
+							}
+						}
+					}
+					&.differentMonth {
+						& div.date-content {
+							& div.date-label {
+								color: gray;
+							}
+							& button {
+								background-color: rgba(0, 0, 0, 0.05);
 							}
 						}
 					}
