@@ -371,7 +371,7 @@
 			max-width: 400px;
 			justify-content: space-between;
 			align-items: center;
-			padding: 1rem;
+			padding: 1rem 1rem 2rem;
 			margin: 0 auto;
 			gap: 2rem;
 			& .controls-center {
