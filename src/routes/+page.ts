@@ -1,3 +1,4 @@
+import { resolve } from '$app/paths';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
@@ -6,6 +7,6 @@ export const load: PageLoad = async ({ parent }) => {
 	// Currently, it just returns the data passed from the server.
 	const { user } = await parent();
 	if (user) {
-		redirect(303, '/calendar');
+		redirect(303, resolve('/calendars'));
 	}
 };

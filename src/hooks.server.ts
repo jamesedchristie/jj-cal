@@ -8,7 +8,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get('token');
 	const user = token ? await getUserByToken(event.locals.db, token) : null;
 	event.locals.user = user;
-	if (!user && event.url.pathname.startsWith('/calendar')) {
+	if (!user && event.url.pathname.startsWith('/calendars')) {
 		redirect(303, '/');
 	}
 	const response = await resolve(event);

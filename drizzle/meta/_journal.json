@@ -22,6 +22,13 @@
       "when": 1755499231129,
       "tag": "0002_abandoned_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1755666778254,
+      "tag": "0003_last_red_skull",
+      "breakpoints": true
     }
   ]
 }

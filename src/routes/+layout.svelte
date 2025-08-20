@@ -1,5 +1,6 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+	import Button from '$lib/components/Button.svelte';
 	import type { Snippet } from 'svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
@@ -24,7 +25,7 @@
 			<span>Logged in as: {data.user?.name ?? 'Not logged in'}</span>
 			{#if data.user}
 				<form {...logout}>
-					<button>Logout</button>
+					<Button type="submit">Logout</Button>
 				</form>
 			{/if}
 		</div>
@@ -44,7 +45,6 @@
 		height: 100vh;
 		display: flex;
 		flex-direction: column;
-		padding: 1rem;
 		overflow: hidden;
 	}
 	header {
@@ -52,6 +52,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		padding: 1rem;
 		& .header-right {
 			display: flex;
 			justify-content: flex-end;

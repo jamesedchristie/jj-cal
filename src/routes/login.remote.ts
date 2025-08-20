@@ -1,3 +1,4 @@
+import { resolve } from '$app/paths';
 import { form, getRequestEvent } from '$app/server';
 import { env } from '$env/dynamic/private';
 import { createUser, getUserByName, setUserToken } from '$lib/server/db/queries';
@@ -18,7 +19,7 @@ export const login = form(async (formData) => {
 		const token = crypto.randomUUID();
 		await setUserToken(locals.db, user.id, token);
 		cookies.set('token', token, { path: '/', httpOnly: true, secure: true });
-		redirect(303, '/calendar');
+		redirect(303, resolve('/calendars'));
 	} else {
 		return fail(422, { message: 'Invalid credentials' });
 	}
