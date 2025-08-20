@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
 	import Button from '$lib/components/Button.svelte';
 	import type { Snippet } from 'svelte';
@@ -20,7 +21,9 @@
 
 <div class="layout-wrapper">
 	<header>
-		<h1>JJ Cal</h1>
+		<a href={resolve('/calendars')}>
+			<h1>JJ Cal</h1>
+		</a>
 		<div class="header-right">
 			<span>Logged in as: {data.user?.name ?? 'Not logged in'}</span>
 			{#if data.user}
@@ -31,12 +34,7 @@
 		</div>
 	</header>
 	<main>
-		<svelte:boundary>
-			{#snippet pending()}
-				Loading...
-			{/snippet}
-			{@render children?.()}
-		</svelte:boundary>
+		{@render children?.()}
 	</main>
 </div>
 
@@ -53,6 +51,10 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 1rem;
+		a {
+			text-decoration: none;
+			color: inherit;
+		}
 		& .header-right {
 			display: flex;
 			justify-content: flex-end;

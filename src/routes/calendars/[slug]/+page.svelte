@@ -5,8 +5,8 @@
 	import NameTag from '$lib/components/NameTag.svelte';
 	import Textarea from '$lib/components/Textarea.svelte';
 	import { tick } from 'svelte';
-	import type { PageData } from '../$types';
-	import { addEventToDate, editEvent, loadCalendar, loadEvents, removeEvent } from './data.remote';
+	import type { PageData } from './$types';
+	import { addEventToDate, editEvent, loadEvents, removeEvent } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 
 	interface Props {
@@ -14,11 +14,10 @@
 	}
 
 	let { data }: Props = $props();
-	let { user } = $derived(data);
+	let { user, calendar } = $derived(data);
 
 	let now = new Date();
 	let calendarSlug = $derived(page.params.slug!);
-	let calendar = $derived(await loadCalendar(calendarSlug));
 	let year = $derived(Number(page.url.searchParams.get('year') || now.getFullYear()));
 	let month = $derived(Number(page.url.searchParams.get('month') || now.getMonth() + 1));
 
@@ -225,7 +224,7 @@
 	</section>
 </div>
 
-<dialog bind:this={dialog}>
+<dialog bind:this={dialog} closedby="any">
 	<div class="close-dialog">
 		<Button onclick={hideDialog}>Close</Button>
 	</div>
@@ -259,7 +258,18 @@
 			}}
 		>
 			<div class="text-input">
-				<Textarea bind:value={editingText} placeholder="Add event" style="width: 100%"></Textarea>
+				<Textarea
+					bind:value={editingText}
+					placeholder="Add event"
+					style="width: 100%"
+					onkeydown={(e) => {
+						if (e.key === 'Enter' && e.metaKey) {
+							e.preventDefault();
+							if (selectedDate) createEvent(selectedDate, editingText);
+							editingText = '';
+						}
+					}}
+				></Textarea>
 			</div>
 			<div class="actions">
 				<Button type="submit" disabled={!editingText.length}>Create</Button>
@@ -317,7 +327,9 @@
 						width: 100%;
 						height: 100%;
 						& div.date-label {
-							flex: none;
+							position: absolute;
+							top: 0;
+							right: 0;
 							display: flex;
 							justify-content: flex-end;
 							padding: 2px;
@@ -358,7 +370,7 @@
 		& .close-dialog {
 			display: flex;
 			justify-content: flex-end;
-			padding: 0.5rem 0.5rem 0;
+			padding: 1rem 1rem 0;
 		}
 		& section.events {
 			padding: 0 1rem;
@@ -381,7 +393,7 @@
 			}
 		}
 		& section.new-event {
-			padding: 0.5rem 1rem;
+			padding: 0.5rem 1rem 1rem;
 			& form {
 				& .actions {
 					display: flex;
