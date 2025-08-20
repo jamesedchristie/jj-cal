@@ -1,5 +1,6 @@
 <script>
 	import Button from '$lib/components/Button.svelte';
+	import TextInput from '$lib/components/TextInput.svelte';
 	import { login } from './login.remote';
 </script>
 
@@ -8,7 +9,7 @@
 
 	<form {...login}>
 		<label>
-			<input type="password" name="password" placeholder="Enter your password" />
+			<TextInput type="password" name="password" placeholder="Enter your password" />
 		</label>
 		<Button type="submit" style="width: 100%;">Login</Button>
 	</form>
@@ -29,8 +30,7 @@
 			gap: 1rem;
 			width: 100%;
 			max-width: 300px;
-			& label,
-			& input {
+			& label {
 				width: 100%;
 			}
 		}

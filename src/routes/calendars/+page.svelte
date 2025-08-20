@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Button from '$lib/components/Button.svelte';
+	import TextInput from '$lib/components/TextInput.svelte';
 	import { createNewCalendar, getCalendars } from './data.remote';
 
 	let calendars = await getCalendars();
@@ -16,28 +17,30 @@
 
 <section>
 	<h1>Calendars</h1>
-	<ul>
-		{#each calendars as calendar}
-			<li>
-				<Button
-					href={resolve('/calendars/[slug]', { slug: calendar.slug })}
-					style="padding: 2rem; text-align: center;">{calendar.name}</Button
-				>
-			</li>
-		{/each}
-	</ul>
-	<div class="add-calendar">
-		<form {...createNewCalendar}>
-			<label>
-				New Calendar Name:
-				<input type="text" name="name" bind:value={name} required />
-			</label>
-			<label>
-				Slug:
-				<input type="text" name="slug" value={slug} required />
-			</label>
-			<Button type="submit" style="padding: 0.5rem">Create Calendar</Button>
-		</form>
+	<div class="calendars">
+		<ul>
+			{#each calendars as calendar}
+				<li>
+					<Button
+						href={resolve('/calendars/[slug]', { slug: calendar.slug })}
+						style="padding: 2rem; text-align: center;">{calendar.name}</Button
+					>
+				</li>
+			{/each}
+		</ul>
+		<div class="add-calendar">
+			<form {...createNewCalendar}>
+				<label>
+					New Calendar Name:
+					<TextInput name="name" bind:value={name} required />
+				</label>
+				<label>
+					Slug:
+					<TextInput name="slug" value={slug} required />
+				</label>
+				<Button type="submit" style="padding: 0.5rem">Create Calendar</Button>
+			</form>
+		</div>
 	</div>
 </section>
 
@@ -46,18 +49,29 @@
 		flex: auto;
 		padding: 1rem;
 		overflow: hidden;
+		display: flex;
+		flex-direction: column;
 		& h1 {
 			text-align: center;
 		}
+		& div.calendars {
+			flex: auto;
+			display: flex;
+			flex-direction: column;
+			justify-content: space-evenly;
+			align-items: stretch;
+			gap: 1rem;
+			width: 400px;
+			max-width: 100%;
+			margin: 0 auto;
+		}
 		& ul {
-			margin: 2rem 0;
 			display: flex;
 			flex-direction: column;
 			gap: 1rem;
 			overflow-y: auto;
 		}
 		& div.add-calendar {
-			margin-top: 2rem;
 			& form {
 				display: flex;
 				flex-direction: column;
@@ -66,9 +80,6 @@
 					display: flex;
 					flex-direction: column;
 					gap: 0.2rem;
-				}
-				& input {
-					width: 100%;
 				}
 			}
 		}

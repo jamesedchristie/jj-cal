@@ -18,15 +18,20 @@
 	a,
 	button {
 		display: block;
-		background-color: black;
-		border: none;
-		color: white;
+		min-height: var(--button-height, 30px);
+		background-color: var(--button-bg-color, black);
+		border: var(--button-border-width, 2px) solid;
+		border-color: var(--button-border-color, black);
+		border-radius: var(--button-border-radius, 4px);
+		color: var(--button-text-color, white);
 		text-decoration: none;
 		cursor: pointer;
-		padding: 0.3rem 0.7rem;
-		border-radius: 4px;
+		padding: var(--button-padding, 0.3rem 0.7rem);
+		transition:
+			background-color 0.2s ease,
+			color 0.2s ease;
 		&:hover {
-			background-color: darkgray;
+			background-color: var(--button-hover-bg-color, #333);
 		}
 		&:disabled {
 			opacity: 0.5;
