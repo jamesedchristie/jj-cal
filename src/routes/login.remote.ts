@@ -1,3 +1,4 @@
+import { dev } from '$app/environment';
 import { resolve } from '$app/paths';
 import { form, getRequestEvent } from '$app/server';
 import { env } from '$env/dynamic/private';
@@ -18,7 +19,7 @@ export const login = form(async (formData) => {
 	if (user) {
 		const token = crypto.randomUUID();
 		await setUserToken(locals.db, user.id, token);
-		cookies.set('token', token, { path: '/', httpOnly: true, secure: true });
+		cookies.set('token', token, { path: '/', httpOnly: !dev, secure: !dev });
 		redirect(303, resolve('/calendars'));
 	} else {
 		return fail(422, { message: 'Invalid credentials' });

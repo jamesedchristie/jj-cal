@@ -95,7 +95,7 @@
 	}
 
 	function hideDialog() {
-		dialog?.requestClose();
+		dialog?.close();
 	}
 
 	// function onsubmit(e: SubmitEvent, event: (typeof monthEvents)[number]) {
@@ -181,7 +181,7 @@
 			</thead>
 			<tbody>
 				{#each monthWeeks as week}
-					<tr>
+					<tr style:flex="1 1 {Math.floor(100 / monthWeeks.length)}%">
 						{#each week as date}
 							{@const events = monthEvents.filter((event) => isSameDay(event.datetime, date))}
 							<td
@@ -190,7 +190,6 @@
 									differentMonth: date.getMonth() + 1 !== month,
 									selected: selectedDate && date.getDate() === selectedDate.getDate()
 								}}
-								style:height="{Math.floor(100 / monthWeeks.length)}%"
 							>
 								<div class="date-content">
 									<div class="date-label">
@@ -303,61 +302,91 @@
 				width: 100%;
 				height: 100%;
 				border-collapse: collapse;
+				display: flex;
+				flex-direction: column;
+				align-items: stretch;
 				& thead {
+					flex: none;
+					display: block;
+					width: 100%;
 					& tr {
+						width: 100%;
+						display: flex;
 						& th {
+							flex: 1 1 14%;
+							height: 18px;
 							font-weight: normal;
 							font-size: 12px;
 						}
 					}
 				}
-				& td.day {
-					position: relative;
-					border: 1px solid black;
-					width: 14%;
-					& div.date-content {
-						display: flex;
-						flex-direction: column;
+				& tbody {
+					flex: auto;
+					display: flex;
+					flex-direction: column;
+					& tr {
 						width: 100%;
-						height: 100%;
-						& div.date-label {
-							position: absolute;
-							top: 0;
-							right: 0;
-							display: flex;
-							justify-content: flex-end;
-							padding: 2px;
-							font-size: 14px;
+						display: flex;
+						border-top: var(--table-border, 1px solid lightgray);
+						overflow: hidden;
+						&:last-child {
+							border-bottom: var(--table-border, 1px solid lightgray);
 						}
-						& button {
-							width: 100%;
-							flex: auto;
-							min-height: 80px;
-							padding: 2px;
-							background-color: transparent;
-							border: none;
-							text-align: left;
-							hyphens: auto;
-							font-size: 10px;
-							cursor: pointer;
-							&:hover {
-								background-color: rgba(0, 0, 0, 0.1);
+						& td.day {
+							flex: 1 1 14%;
+							position: relative;
+							width: 14%;
+							border-left: var(--table-border, 1px solid lightgray);
+							padding: 0;
+							&:last-child {
+								border-right: var(--table-border, 1px solid lightgray);
 							}
-							& ul {
+							& div.date-content {
 								display: flex;
 								flex-direction: column;
-								justify-content: center;
-								gap: 5px;
+								width: 100%;
+								height: 100%;
+								overflow: hidden;
+								& div.date-label {
+									position: absolute;
+									top: 0;
+									right: 0;
+									display: flex;
+									justify-content: flex-end;
+									padding: 2px;
+									font-size: 14px;
+								}
+								& button {
+									width: 100%;
+									flex: auto;
+									min-height: 45px;
+									padding: 2px;
+									background-color: transparent;
+									border: none;
+									text-align: left;
+									hyphens: auto;
+									font-size: 10px;
+									cursor: pointer;
+									&:hover {
+										background-color: rgba(0, 0, 0, 0.1);
+									}
+									& ul {
+										display: flex;
+										flex-direction: column;
+										justify-content: center;
+										gap: 5px;
+									}
+								}
 							}
-						}
-					}
-					&.differentMonth {
-						& div.date-content {
-							& div.date-label {
-								color: gray;
-							}
-							& button {
-								background-color: rgba(0, 0, 0, 0.05);
+							&.differentMonth {
+								& div.date-content {
+									& div.date-label {
+										color: gray;
+									}
+									& button {
+										background-color: rgba(0, 0, 0, 0.05);
+									}
+								}
 							}
 						}
 					}
