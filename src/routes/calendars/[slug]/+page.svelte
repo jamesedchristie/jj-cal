@@ -8,6 +8,7 @@
 	import type { PageData } from './$types';
 	import { addEventToDate, editEvent, loadEvents, removeEvent } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
+	import EventsList from './EventsList.svelte';
 
 	interface Props {
 		data: PageData;
@@ -145,6 +146,10 @@
 
 	async function editEventText(event: (typeof monthEvents)[number], text: string) {
 		if (!user) return false;
+		if (!text.trim()) {
+			await deleteEvent(event);
+			return true;
+		}
 		await editEvent({ id: event.id, text }).updates(
 			loadEvents({ calendarSlug, year, month }).withOverride((events) =>
 				events.map((e) => (e.id === event.id ? { ...e, text } : e))
@@ -196,7 +201,8 @@
 										{date.getDate()}
 									</div>
 									<button type="button" onclick={() => handleDateClick(date)}>
-										<ul>
+										<EventsList {events} />
+										<!-- <ul>
 											{#each events as event}
 												<li class="event">
 													<span class="event-text"
@@ -204,7 +210,7 @@
 													>
 												</li>
 											{/each}
-										</ul>
+										</ul> -->
 									</button>
 								</div>
 							</td>
@@ -367,14 +373,11 @@
 									hyphens: auto;
 									font-size: 10px;
 									cursor: pointer;
+									display: flex;
+									flex-direction: column;
+									justify-content: center;
 									&:hover {
 										background-color: rgba(0, 0, 0, 0.1);
-									}
-									& ul {
-										display: flex;
-										flex-direction: column;
-										justify-content: center;
-										gap: 5px;
 									}
 								}
 							}

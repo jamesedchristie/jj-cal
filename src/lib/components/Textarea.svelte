@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { HTMLTextareaAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLTextareaAttributes {
@@ -13,12 +14,14 @@
 	$effect(() => {
 		value;
 		// Calculate height of the textarea based on its content
-		if (!el) return;
-		el.style.height = 'auto'; // Reset height to auto to get the scrollHeight correctly
-		const newHeight = Math.max(el.scrollHeight + 2, 27) + 'px';
-		if (el.style.height !== newHeight) {
-			el.style.height = newHeight;
-		}
+		tick().then(() => {
+			if (!el) return;
+			el.style.height = 'auto'; // Reset height to auto to get the scrollHeight correctly
+			const newHeight = Math.max(el.scrollHeight + 2, 27) + 'px';
+			if (el.style.height !== newHeight) {
+				el.style.height = newHeight;
+			}
+		});
 	});
 </script>
 

@@ -18,16 +18,19 @@
 <section>
 	<h1>Calendars</h1>
 	<div class="calendars">
-		<ul>
-			{#each calendars as calendar}
-				<li>
-					<Button
-						href={resolve('/calendars/[slug]', { slug: calendar.slug })}
-						style="padding: 2rem; text-align: center;">{calendar.name}</Button
-					>
-				</li>
-			{/each}
-		</ul>
+		{#if calendars.length}
+			<ul>
+				{#each calendars as calendar}
+					<li>
+						<Button
+							href={resolve('/calendars/[slug]', { slug: calendar.slug })}
+							style="padding: 2rem; text-align: center;">{calendar.name}</Button
+						>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
 		<div class="add-calendar">
 			<form {...createNewCalendar}>
 				<label>
