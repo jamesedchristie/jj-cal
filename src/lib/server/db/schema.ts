@@ -23,3 +23,14 @@ export const eventsTable = sqliteTable('event', {
 	created_by_name: text('created_by_name').notNull(),
 	created_by_id: integer('created_by_id').notNull()
 });
+
+export const todosTable = sqliteTable('todo', {
+	id: integer('id').primaryKey(),
+	text: text('text').notNull(),
+	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
+	completed_at: integer('completed_at'),
+	sort_order: integer('sort_order').notNull().default(0),
+	created_at: integer('created_at').notNull(),
+	created_by_name: text('created_by_name').notNull(),
+	created_by_id: integer('created_by_id').notNull()
+});

@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
 	import Button from '$lib/components/Button.svelte';
+	import BottomNav from '$lib/components/BottomNav.svelte';
 	import type { Snippet } from 'svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
@@ -55,6 +56,7 @@
 	<main>
 		{@render children?.()}
 	</main>
+	<BottomNav />
 </div>
 
 <style>

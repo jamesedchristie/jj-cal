@@ -1,6 +1,6 @@
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, eq, gt, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, usersTable } from './schema';
+import { calendarsTable, eventsTable, todosTable, usersTable } from './schema';
 
 export async function getUserByName(db: DrizzleClient, name: string) {
 	const user = await db.select().from(usersTable).where(eq(usersTable.name, name));
@@ -83,6 +83,34 @@ export async function updateEventText(db: DrizzleClient, id: number, text: strin
 export async function deleteEvent(db: DrizzleClient, id: number) {
 	await db.delete(eventsTable).where(eq(eventsTable.id, id));
 	return true;
+}
+
+export async function getAllTodos(db: DrizzleClient) {
+	return db.select().from(todosTable).orderBy(asc(todosTable.sort_order), asc(todosTable.created_at));
+}
+
+export async function createTodo(
+	db: DrizzleClient,
+	input: { text: string; created_by_id: number; created_by_name: string; sort_order: number }
+) {
+	const todo = await db
+		.insert(todosTable)
+		.values({ ...input, created_at: Date.now() })
+		.returning();
+	return todo[0];
+}
+
+export async function setTodoCompleted(db: DrizzleClient, id: number, completed: boolean) {
+	const todo = await db
+		.update(todosTable)
+		.set({ completed, completed_at: completed ? Date.now() : null })
+		.where(eq(todosTable.id, id))
+		.returning();
+	return todo[0];
+}
+
+export async function deleteTodo(db: DrizzleClient, id: number) {
+	await db.delete(todosTable).where(eq(todosTable.id, id));
 }
 
 export async function getEventsForMonth(
