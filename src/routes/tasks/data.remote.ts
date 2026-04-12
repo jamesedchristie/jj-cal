@@ -8,15 +8,19 @@ export const getTodos = query(async () => {
 });
 
 export const addTodo = form(
-	v.object({ text: v.pipe(v.string(), v.nonEmpty()) }),
-	async ({ text }) => {
+	v.object({
+		text: v.pipe(v.string(), v.nonEmpty()),
+		due_date: v.pipe(v.string(), v.transform((s) => s || null))
+	}),
+	async ({ text, due_date }) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await createTodo(locals.db, {
 			text: text.trim(),
 			created_by_id: locals.user.id,
 			created_by_name: locals.user.name,
-			sort_order: Date.now()
+			sort_order: Date.now(),
+			due_date
 		});
 		// Single-flight: refresh the query as part of this same request
 		void getTodos().refresh();
