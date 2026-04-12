@@ -1,5 +1,5 @@
 :root {
-	--heading-font-family: Times, 'Times New Roman', serif
+	--heading-font-family: Times, 'Times New Roman', serif;
 }
 
 body {
@@ -8,10 +8,17 @@ body {
 
 body * {
 	box-sizing: border-box;
-	font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+	font-family:
+		'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana,
+		sans-serif;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
 	font-weight: 500;
 	font-family: var(--heading-font-family);
 	margin: 0;
