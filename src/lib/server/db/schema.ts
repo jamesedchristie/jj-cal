@@ -29,6 +29,7 @@ export const todosTable = sqliteTable('todo', {
 	text: text('text').notNull(),
 	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
 	completed_at: integer('completed_at'),
+	due_date: text('due_date'),
 	sort_order: integer('sort_order').notNull().default(0),
 	created_at: integer('created_at').notNull(),
 	created_by_name: text('created_by_name').notNull(),

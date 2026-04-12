@@ -91,7 +91,7 @@ export async function getAllTodos(db: DrizzleClient) {
 
 export async function createTodo(
 	db: DrizzleClient,
-	input: { text: string; created_by_id: number; created_by_name: string; sort_order: number }
+	input: { text: string; created_by_id: number; created_by_name: string; sort_order: number; due_date?: string | null }
 ) {
 	const todo = await db
 		.insert(todosTable)
