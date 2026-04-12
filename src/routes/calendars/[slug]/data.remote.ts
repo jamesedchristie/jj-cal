@@ -1,4 +1,4 @@
-import { command, getRequestEvent, query } from '$app/server';
+import { command, getRequestEvent, query, requested } from '$app/server';
 import {
 	createEvent,
 	deleteEvent,
@@ -34,6 +34,9 @@ export const addEventToDate = command(
 				timeZone: 'Australia/Sydney'
 			}).epochMilliseconds;
 			await createEvent(locals.db, { calendarSlug, datetime, text, name });
+			for (const arg of requested(loadEvents, 1)) {
+				void loadEvents(arg).refresh();
+			}
 			return { success: true };
 		} catch (err) {
 			console.log(err);
@@ -46,6 +49,9 @@ export const editEvent = command('unchecked', async ({ id, text }) => {
 	const { locals } = getRequestEvent();
 	try {
 		await updateEventText(locals.db, id, text);
+		for (const arg of requested(loadEvents, 1)) {
+			void loadEvents(arg).refresh();
+		}
 		return { success: true };
 	} catch (err) {
 		console.log(err);
@@ -57,6 +63,9 @@ export const removeEvent = command('unchecked', async ({ id }) => {
 	const { locals } = getRequestEvent();
 	try {
 		await deleteEvent(locals.db, id);
+		for (const arg of requested(loadEvents, 1)) {
+			void loadEvents(arg).refresh();
+		}
 		return { success: true };
 	} catch (err) {
 		console.log(err);
