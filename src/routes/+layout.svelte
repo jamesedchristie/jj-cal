@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { pwaInfo } from 'virtual:pwa-info';
 	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
 	import Button from '$lib/components/Button.svelte';
@@ -6,6 +8,8 @@
 	import '../app.css';
 	import type { LayoutData } from './$types';
 	import { logout } from './login.remote';
+	import { setToastService, ToastService } from '$lib/components/toast/toastService.svelte';
+	import Toast from '$lib/components/toast/Toast.svelte';
 
 	interface Props {
 		data: LayoutData;
@@ -13,11 +17,26 @@
 	}
 
 	let { children, data }: Props = $props();
+
+	const toastService = new ToastService();
+
+	setToastService(() => toastService);
+
+	const webManifestLink = pwaInfo?.webManifest.linkTag ?? '';
+
+	onMount(() => {
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.register('/sw.js', { scope: '/' });
+		}
+	});
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	{@html webManifestLink}
 </svelte:head>
+
+<Toast />
 
 <div class="layout-wrapper">
 	<header>
