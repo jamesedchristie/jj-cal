@@ -1,5 +1,6 @@
 <script lang="ts">
 	import NameTag from '$lib/components/NameTag.svelte';
+	import { flip } from 'svelte/animate';
 	import type { CalendarEvent } from './events.svelte';
 
 	interface Props {
@@ -19,8 +20,8 @@
 </script>
 
 <ul bind:this={ul} class={{ list: displayMode === 'list', summary: displayMode === 'summary' }}>
-	{#each events as event}
-		<li class="event">
+	{#each events as event (event.id)}
+		<li class="event" animate:flip>
 			<span class="event-name"><NameTag name={event.created_by_name} /></span>
 			<span class="event-text">{event.text}</span>
 		</li>

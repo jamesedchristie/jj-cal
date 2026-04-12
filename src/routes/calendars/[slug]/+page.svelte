@@ -9,6 +9,9 @@
 	import { addEventToDate, editEvent, loadEvents, removeEvent } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 	import EventsList from './EventsList.svelte';
+	import { flip } from 'svelte/animate';
+	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+	import Toast from '$lib/components/toast/Toast.svelte';
 
 	interface Props {
 		data: PageData;
@@ -17,25 +20,19 @@
 	let { data }: Props = $props();
 	let { user, calendar } = $derived(data);
 
+	const toastService = getToastService();
+
 	let now = new Date();
 	let calendarSlug = $derived(page.params.slug!);
 	let year = $derived(Number(page.url.searchParams.get('year') || now.getFullYear()));
 	let month = $derived(Number(page.url.searchParams.get('month') || now.getMonth() + 1));
 
-	let prevMonthName = $derived.by(() => {
-		const date = new Date(year, month - 2);
-		return date.toLocaleString('default', { month: 'long' });
-	});
 	let prevMonthHref = $derived.by(() => {
 		const date = new Date(year, month - 2);
 		return `${resolve('/calendars/[slug]', { slug: calendarSlug })}?year=${date.getFullYear()}&month=${date.getMonth() + 1}`;
 	});
 	let monthName = $derived.by(() => {
 		const date = new Date(year, month - 1);
-		return date.toLocaleString('default', { month: 'long' });
-	});
-	let nextMonthName = $derived.by(() => {
-		const date = new Date(year, month);
 		return date.toLocaleString('default', { month: 'long' });
 	});
 	let nextMonthHref = $derived.by(() => {
@@ -45,10 +42,12 @@
 
 	let monthWeeks = $derived.by(() => {
 		const weeks: Date[][] = [];
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		let first = new Date(year, month - 1, 1);
 		if (first.getDay() !== 0) {
 			first.setDate(first.getDate() - first.getDay());
 		}
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		let last = new Date(year, month - 1, 1);
 		last.setMonth(last.getMonth() + 1);
 		if (last.getDay() !== 6) {
@@ -73,7 +72,6 @@
 		monthEvents.filter((e) => selectedDate && isSameDay(e.datetime, selectedDate))
 	);
 
-	let selectedEvent = $state<(typeof monthEvents)[number] | null>(null);
 	let editingText = $state('');
 
 	let dialog = $state<HTMLDialogElement>();
@@ -141,6 +139,7 @@
 		}).updates(
 			loadEvents({ calendarSlug, year, month }).withOverride((events) => [...events, newEvent])
 		);
+		toastService().show(new ToastMessage('Event created successfully!'));
 		return true;
 	}
 
@@ -185,9 +184,9 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each monthWeeks as week}
+				{#each monthWeeks as week (week[0]?.getTime())}
 					<tr style:flex="1 1 {Math.floor(100 / monthWeeks.length)}%">
-						{#each week as date}
+						{#each week as date (date.getTime())}
 							{@const events = monthEvents.filter((event) => isSameDay(event.datetime, date))}
 							<td
 								class={{
@@ -234,14 +233,15 @@
 </div>
 
 <dialog bind:this={dialog} closedby="any">
+	<Toast />
 	<div class="close-dialog">
 		<Button onclick={hideDialog}>Close</Button>
 	</div>
 	<section class="events">
 		{#if selectedDateEvents.length}
 			<ul>
-				{#each selectedDateEvents as event}
-					<li>
+				{#each selectedDateEvents as event (event.id)}
+					<li animate:flip>
 						<div class="event-input">
 							<NameTag name={event.created_by_name} />
 							<Textarea

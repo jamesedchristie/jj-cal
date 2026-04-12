@@ -20,7 +20,7 @@
 	<div class="calendars">
 		{#if calendars.length}
 			<ul>
-				{#each calendars as calendar}
+				{#each calendars as calendar (calendar.id)}
 					<li>
 						<Button
 							href={resolve('/calendars/[slug]', { slug: calendar.slug })}
