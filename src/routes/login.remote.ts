@@ -4,27 +4,32 @@ import { form, getRequestEvent } from '$app/server';
 import { env } from '$env/dynamic/private';
 import { createUser, getUserByName, setUserToken } from '$lib/server/db/queries';
 import { fail, redirect } from '@sveltejs/kit';
+import * as v from 'valibot';
 
-export const login = form(async (formData) => {
-	const { locals, cookies } = getRequestEvent();
-	const password = formData.get('password');
-	let user: { id: number; name: string } | null = null;
-	if (password === env.JIM_PASSWORD) {
-		user = await getUserByName(locals.db, 'Jim');
-		if (!user) user = await createUser(locals.db, 'Jim');
-	} else if (password === env.JASMIN_PASSWORD) {
-		user = await getUserByName(locals.db, 'Jasmin');
-		if (!user) user = await createUser(locals.db, 'Jasmin');
+export const login = form(
+	v.object({
+		password: v.pipe(v.string(), v.nonEmpty())
+	}),
+	async ({ password }) => {
+		const { locals, cookies } = getRequestEvent();
+		let user: { id: number; name: string } | null = null;
+		if (password === env.JIM_PASSWORD) {
+			user = await getUserByName(locals.db, 'Jim');
+			if (!user) user = await createUser(locals.db, 'Jim');
+		} else if (password === env.JASMIN_PASSWORD) {
+			user = await getUserByName(locals.db, 'Jasmin');
+			if (!user) user = await createUser(locals.db, 'Jasmin');
+		}
+		if (user) {
+			const token = crypto.randomUUID();
+			await setUserToken(locals.db, user.id, token);
+			cookies.set('token', token, { path: '/', httpOnly: !dev, secure: !dev });
+			redirect(303, resolve('/calendars'));
+		} else {
+			return fail(422, { message: 'Invalid credentials' });
+		}
 	}
-	if (user) {
-		const token = crypto.randomUUID();
-		await setUserToken(locals.db, user.id, token);
-		cookies.set('token', token, { path: '/', httpOnly: !dev, secure: !dev });
-		redirect(303, resolve('/calendars'));
-	} else {
-		return fail(422, { message: 'Invalid credentials' });
-	}
-});
+);
 
 export const logout = form(async () => {
 	const { cookies } = getRequestEvent();
