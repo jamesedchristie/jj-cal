@@ -47,6 +47,9 @@
 		</a>
 		<div class="header-right">
 			{#if data.user}
+				{#if data.user.isAdmin}
+					<a href={resolve('/admin/invites')} class="admin-link">Invites</a>
+				{/if}
 				<a href={resolve('/profile')} class="profile-link" aria-label="Edit profile">
 					<UserAvatar
 						name={data.user.name}
@@ -93,6 +96,12 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
+	}
+
+	.admin-link {
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-muted);
 	}
 
 	.profile-link {

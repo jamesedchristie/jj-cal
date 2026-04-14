@@ -67,6 +67,16 @@ export const verificationsTable = sqliteTable('verification', {
 // App tables
 // ---------------------------------------------------------------------------
 
+// jj-cal-4rop: invite system
+export const invitesTable = sqliteTable('invite', {
+	id: text('id').primaryKey(),
+	token: text('token').notNull().unique(),
+	createdById: text('created_by_id').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+	revokedAt: integer('revoked_at', { mode: 'timestamp' })
+});
+
 export const calendarsTable = sqliteTable('calendar', {
 	id: integer('id').primaryKey(),
 	name: text('name').notNull().unique(),

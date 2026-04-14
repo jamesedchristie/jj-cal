@@ -1,11 +1,41 @@
-import { and, asc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, todosTable } from './schema';
+import { calendarsTable, eventsTable, invitesTable, todosTable } from './schema';
 
 // ---------------------------------------------------------------------------
 // User management is now handled by better-auth. These helpers have been
 // removed: getUserByToken, getUserByName, setUserToken, createUser.
 // ---------------------------------------------------------------------------
+
+// jj-cal-4rop: invite system
+
+export async function createInvite(
+	db: DrizzleClient,
+	input: { id: string; token: string; createdById: string; createdAt: Date; expiresAt: Date }
+) {
+	const { id, token, createdById, createdAt, expiresAt } = input;
+	const rows = await db
+		.insert(invitesTable)
+		.values({ id, token, createdById, createdAt, expiresAt })
+		.returning();
+	return rows[0];
+}
+
+export async function getAllInvites(db: DrizzleClient) {
+	return db.select().from(invitesTable).orderBy(desc(invitesTable.createdAt));
+}
+
+export async function getInviteByToken(db: DrizzleClient, token: string) {
+	const rows = await db.select().from(invitesTable).where(eq(invitesTable.token, token));
+	return rows[0] ?? null;
+}
+
+export async function revokeInvite(db: DrizzleClient, id: string) {
+	await db
+		.update(invitesTable)
+		.set({ revokedAt: new Date() })
+		.where(eq(invitesTable.id, id));
+}
 
 export async function createCalendar(
 	db: DrizzleClient,

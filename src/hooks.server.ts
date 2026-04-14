@@ -32,6 +32,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!user && event.url.pathname.startsWith('/tasks')) {
 		redirect(303, '/');
 	}
+	// Admin routes: must be logged in AND be an admin.
+	if (event.url.pathname.startsWith('/admin')) {
+		if (!user) redirect(303, '/');
+		if (!user.isAdmin) redirect(303, '/calendars');
+	}
 
 	// Route /api/auth/* requests to better-auth; pass everything else through.
 	return svelteKitHandler({ auth, event, resolve, building });
