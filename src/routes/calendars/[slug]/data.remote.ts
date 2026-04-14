@@ -4,6 +4,7 @@ import {
 	deleteEvent,
 	getCalendarBySlug,
 	getEventsForMonth,
+	getUsersBasic,
 	updateEventText
 } from '$lib/server/db/queries';
 import { error } from '@sveltejs/kit';
@@ -16,6 +17,12 @@ export const loadCalendar = query('unchecked', async (slug: string) => {
 	return calendar;
 });
 
+// jj-cal-4v2c: used to tint events with their creator's colour
+export const loadUserColours = query(async () => {
+	const { locals } = getRequestEvent();
+	return getUsersBasic(locals.db);
+});
+
 export const loadEvents = query('unchecked', async ({ calendarSlug, year, month }) => {
 	const { locals } = getRequestEvent();
 	const events = await getEventsForMonth(locals.db, calendarSlug, year, month);
@@ -24,16 +31,26 @@ export const loadEvents = query('unchecked', async ({ calendarSlug, year, month 
 
 export const addEventToDate = command(
 	'unchecked',
-	async ({ calendarSlug, year, month, date, text, name }) => {
+	async ({ calendarSlug, year, month, date, text }) => {
 		const { locals } = getRequestEvent();
+		if (!locals.user) return { success: false };
 		try {
+			const calendar = await getCalendarBySlug(locals.db, calendarSlug);
+			if (!calendar) return { success: false };
 			const datetime = Temporal.ZonedDateTime.from({
 				year,
 				month,
 				day: date,
 				timeZone: 'Australia/Sydney'
 			}).epochMilliseconds;
-			await createEvent(locals.db, { calendarSlug, datetime, text, name });
+			await createEvent(locals.db, {
+				calendarSlug,
+				calendarId: calendar.id,
+				datetime,
+				text,
+				created_by_name: locals.user.name,
+				created_by_id: locals.user.id
+			});
 			for (const arg of requested(loadEvents, 1)) {
 				void loadEvents(arg).refresh();
 			}

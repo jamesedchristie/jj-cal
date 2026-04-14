@@ -9,7 +9,7 @@
 	);
 
 	let open = $state(false);
-	let inputEl: HTMLInputElement | undefined;
+	let inputEl = $state<HTMLInputElement | undefined>();
 
 	async function openSheet() {
 		open = true;
@@ -74,38 +74,39 @@
 <style>
 	.fab {
 		position: fixed;
-		bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
-		right: 1.25rem;
-		width: 56px;
-		height: 56px;
-		border-radius: 50%;
-		background: #111827;
+		bottom: calc(var(--nav-height) + var(--safe-bottom));
+		right: var(--space-5);
+		width: var(--size-fab);
+		height: var(--size-fab);
+		border-radius: var(--radius-full);
+		background: var(--color-primary);
 		border: none;
-		color: #fff;
+		color: var(--color-primary-text);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
-		z-index: 40;
-		transition: transform 0.15s ease, box-shadow 0.15s ease;
+		box-shadow: var(--shadow-fab);
+		z-index: var(--z-fab);
+		transition: transform var(--duration-fast) var(--ease-standard),
+			box-shadow var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 24px;
-			height: 24px;
+			width: var(--size-icon-lg);
+			height: var(--size-icon-lg);
 		}
 
 		&:active {
 			transform: scale(0.93);
-			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+			box-shadow: var(--shadow-fab-pressed);
 		}
 	}
 
 	.backdrop {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.4);
-		z-index: 50;
+		background: var(--color-overlay);
+		z-index: var(--z-modal);
 	}
 
 	.sheet {
@@ -113,66 +114,67 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background: #fff;
-		border-radius: 16px 16px 0 0;
-		padding: 0.625rem 1.25rem calc(1.75rem + env(safe-area-inset-bottom, 0px));
-		z-index: 51;
-		box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+		background: var(--color-surface);
+		border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+		padding: var(--space-2) var(--space-5) calc(var(--space-7) + var(--safe-bottom));
+		z-index: calc(var(--z-modal) + 1);
+		box-shadow: var(--shadow-sheet);
 	}
 
 	.handle {
-		width: 36px;
-		height: 4px;
-		background: #e5e7eb;
-		border-radius: 2px;
-		margin: 0 auto 1.25rem;
+		width: var(--size-handle-width);
+		height: var(--space-1);
+		background: var(--color-border);
+		border-radius: var(--radius-xs);
+		margin: 0 auto var(--space-5);
 	}
 
 	.sheet-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #6b7280;
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-muted);
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin: 0 0 0.75rem;
+		letter-spacing: var(--letter-spacing-wide);
+		margin: 0 0 var(--space-3);
 	}
 
 	.sheet-form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: var(--space-3);
 	}
 
 	.sheet-input {
 		width: 100%;
-		border: 1.5px solid #e5e7eb;
-		border-radius: 10px;
-		padding: 0.875rem 1rem;
-		font-size: 1rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		padding: var(--space-3) var(--space-4);
+		font-size: var(--font-size-base);
 		outline: none;
-		background: #f9fafb;
+		background: var(--color-surface-sunken);
 		box-sizing: border-box;
-		transition: border-color 0.15s ease, background 0.15s ease;
+		transition: border-color var(--duration-fast) var(--ease-standard),
+			background var(--duration-fast) var(--ease-standard);
 
 		&:focus {
-			border-color: #111827;
-			background: #fff;
+			border-color: var(--color-text);
+			background: var(--color-surface);
 		}
 	}
 
 	.sheet-submit {
-		background: #111827;
-		color: #fff;
+		background: var(--color-primary);
+		color: var(--color-primary-text);
 		border: none;
-		border-radius: 10px;
-		padding: 0.875rem;
-		font-size: 1rem;
-		font-weight: 600;
+		border-radius: var(--radius-md);
+		padding: var(--space-3);
+		font-size: var(--font-size-base);
+		font-weight: var(--font-weight-semibold);
 		cursor: pointer;
-		transition: background 0.15s ease;
+		transition: background var(--duration-fast) var(--ease-standard);
 
 		&:active {
-			background: #374151;
+			background: var(--color-primary-hover);
 		}
 	}
 </style>

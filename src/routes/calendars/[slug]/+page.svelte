@@ -6,7 +6,7 @@
 	import Textarea from '$lib/components/Textarea.svelte';
 	import { tick } from 'svelte';
 	import type { PageData } from './$types';
-	import { addEventToDate, editEvent, loadEvents, removeEvent } from './data.remote';
+	import { addEventToDate, editEvent, loadEvents, loadUserColours, removeEvent } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 	import EventsList from './EventsList.svelte';
 	import { flip } from 'svelte/animate';
@@ -66,6 +66,10 @@
 
 	let monthEventsData = $derived(await loadEvents({ calendarSlug, year, month }));
 	let monthEvents = $derived(monthEventsData.map((e) => new CalendarEvent(e)));
+	let userColourRows = $derived(await loadUserColours());
+	const colourOf = $derived(
+		(id: string) => userColourRows.find((u) => u.id === id)?.colour ?? null
+	);
 	let selectedDate = $state<Date | null>(null);
 
 	let selectedDateEvents = $derived(
@@ -127,15 +131,14 @@
 			datetime: date.getTime(),
 			text,
 			created_by_name: user?.name ?? '',
-			created_by_id: user?.id ?? 1
+			created_by_id: user?.id ?? ''
 		};
 		await addEventToDate({
 			calendarSlug,
 			year: date.getFullYear(),
 			month: date.getMonth() + 1,
 			date: date.getDate(),
-			text,
-			name: user.name
+			text
 		}).updates(
 			loadEvents({ calendarSlug, year, month }).withOverride((events) => [...events, newEvent])
 		);
@@ -200,7 +203,7 @@
 										{date.getDate()}
 									</div>
 									<button type="button" onclick={() => handleDateClick(date)}>
-										<EventsList {events} />
+										<EventsList {events} {colourOf} />
 										<!-- <ul>
 											{#each events as event}
 												<li class="event">
@@ -243,7 +246,7 @@
 				{#each selectedDateEvents as event (event.id)}
 					<li animate:flip>
 						<div class="event-input">
-							<NameTag name={event.created_by_name} />
+							<NameTag name={event.created_by_name} colour={colourOf(event.created_by_id)} />
 							<Textarea
 								bind:value={event.text}
 								onchange={() => editEventText(event, event.text || '')}
@@ -293,101 +296,125 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		& section.heading {
+
+		section.heading {
 			display: flex;
 			justify-content: center;
-			padding: 0 1rem 1rem;
-			& h2 {
-				font-size: 1.2rem;
+			padding: 0 var(--space-4) var(--space-4);
+
+			h2 {
+				font-size: var(--font-size-lg);
+				font-family: var(--font-heading);
+				font-weight: var(--font-weight-bold);
 			}
 		}
-		& .calendar {
+
+		.calendar {
 			flex: auto;
 			overflow-y: auto;
-			& table {
+
+			table {
 				width: 100%;
 				height: 100%;
 				border-collapse: collapse;
 				display: flex;
 				flex-direction: column;
 				align-items: stretch;
-				& thead {
+
+				thead {
 					flex: none;
 					display: block;
 					width: 100%;
-					& tr {
+
+					tr {
 						width: 100%;
 						display: flex;
-						& th {
+
+						th {
 							flex: 1 1 14%;
-							height: 18px;
-							font-weight: normal;
-							font-size: 12px;
+							height: var(--space-5);
+							font-weight: var(--font-weight-regular);
+							font-size: var(--font-size-xs);
+							font-family: var(--font-body);
+							color: var(--color-text-muted);
 						}
 					}
 				}
-				& tbody {
+
+				tbody {
 					flex: auto;
 					display: flex;
 					flex-direction: column;
-					& tr {
+
+					tr {
 						width: 100%;
 						display: flex;
-						border-top: var(--table-border, 1px solid lightgray);
+						border-top: 1px solid var(--color-border);
 						overflow: hidden;
+
 						&:last-child {
-							border-bottom: var(--table-border, 1px solid lightgray);
+							border-bottom: 1px solid var(--color-border);
 						}
-						& td.day {
+
+						td.day {
 							flex: 1 1 14%;
 							position: relative;
 							width: 14%;
-							border-left: var(--table-border, 1px solid lightgray);
+							border-left: 1px solid var(--color-border);
 							padding: 0;
+
 							&:last-child {
-								border-right: var(--table-border, 1px solid lightgray);
+								border-right: 1px solid var(--color-border);
 							}
-							& div.date-content {
+
+							div.date-content {
 								display: flex;
 								flex-direction: column;
 								width: 100%;
 								height: 100%;
 								overflow: hidden;
-								& div.date-label {
+
+								div.date-label {
 									position: absolute;
 									top: 0;
 									right: 0;
 									display: flex;
 									justify-content: flex-end;
 									padding: 2px;
-									font-size: 14px;
+									font-size: var(--font-size-xs);
+									font-family: var(--font-body);
+									color: var(--color-text);
 								}
-								& button {
+
+								button {
 									width: 100%;
 									flex: auto;
-									min-height: 45px;
+									min-height: var(--space-10);
 									padding: 2px;
 									background-color: transparent;
 									border: none;
 									text-align: left;
 									hyphens: auto;
-									font-size: 10px;
+									font-size: var(--font-size-xs);
 									cursor: pointer;
 									display: flex;
 									flex-direction: column;
 									justify-content: center;
+
 									&:hover {
-										background-color: rgba(0, 0, 0, 0.1);
+										background-color: color-mix(in srgb, var(--color-text) 8%, transparent);
 									}
 								}
 							}
+
 							&.differentMonth {
-								& div.date-content {
-									& div.date-label {
-										color: gray;
+								div.date-content {
+									div.date-label {
+										color: var(--color-text-subtle);
 									}
-									& button {
-										background-color: rgba(0, 0, 0, 0.05);
+
+									button {
+										background-color: color-mix(in srgb, var(--color-text) 4%, transparent);
 									}
 								}
 							}
@@ -396,62 +423,71 @@
 				}
 			}
 		}
-		& section.controls {
+
+		section.controls {
 			flex: none;
 			width: 100%;
 			display: flex;
 			max-width: 400px;
 			justify-content: space-between;
 			align-items: center;
-			padding: 1rem 1rem 2rem;
+			padding: var(--space-4) var(--space-4) var(--space-8);
 			margin: 0 auto;
-			gap: 2rem;
-			& .controls-center {
-				& h3 {
-					font-size: 1.5rem;
-				}
+			gap: var(--space-8);
+
+			.controls-center h3 {
+				font-size: var(--font-size-xl);
+				font-family: var(--font-heading);
+				font-weight: var(--font-weight-bold);
 			}
 		}
 	}
+
 	dialog {
 		padding: 0;
-		border: 1px solid lightgray;
-		border-radius: 6px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		color: var(--color-text);
 		width: calc(min(90vw, 600px));
-		& .close-dialog {
+
+		.close-dialog {
 			display: flex;
 			justify-content: flex-end;
-			padding: 1rem 1rem 0;
+			padding: var(--space-4) var(--space-4) 0;
 		}
-		& section.events {
-			padding: 0 1rem;
-			& ul {
+
+		section.events {
+			padding: 0 var(--space-4);
+
+			ul {
 				display: flex;
 				flex-direction: column;
-				gap: 0.5rem;
-				& li {
-					& .event-input {
-						display: flex;
-						flex-direction: column;
-						gap: 3px;
-						align-items: flex-start;
-					}
+				gap: var(--space-2);
+
+				li .event-input {
+					display: flex;
+					flex-direction: column;
+					gap: var(--space-1);
+					align-items: flex-start;
 				}
 			}
-			& p {
-				color: gray;
-				font-size: 14px;
+
+			p {
+				color: var(--color-text-muted);
+				font-size: var(--font-size-sm);
+				font-family: var(--font-body);
 			}
 		}
-		& section.new-event {
-			padding: 0.5rem 1rem 1rem;
-			& form {
-				& .actions {
-					display: flex;
-					justify-content: flex-end;
-					gap: 0.5rem;
-					margin-top: 0.5rem;
-				}
+
+		section.new-event {
+			padding: var(--space-2) var(--space-4) var(--space-4);
+
+			form .actions {
+				display: flex;
+				justify-content: flex-end;
+				gap: var(--space-2);
+				margin-top: var(--space-2);
 			}
 		}
 	}

@@ -1,38 +1,11 @@
-import { dev } from '$app/environment';
-import { resolve } from '$app/paths';
-import { form, getRequestEvent } from '$app/server';
-import { env } from '$env/dynamic/private';
-import { createUser, getUserByName, setUserToken } from '$lib/server/db/queries';
-import { fail, redirect } from '@sveltejs/kit';
-import * as v from 'valibot';
-
-export const login = form(
-	v.object({
-		password: v.pipe(v.string(), v.nonEmpty())
-	}),
-	async ({ password }) => {
-		const { locals, cookies } = getRequestEvent();
-		let user: { id: number; name: string } | null = null;
-		if (password === env.JIM_PASSWORD) {
-			user = await getUserByName(locals.db, 'Jim');
-			if (!user) user = await createUser(locals.db, 'Jim');
-		} else if (password === env.JASMIN_PASSWORD) {
-			user = await getUserByName(locals.db, 'Jasmin');
-			if (!user) user = await createUser(locals.db, 'Jasmin');
-		}
-		if (user) {
-			const token = crypto.randomUUID();
-			await setUserToken(locals.db, user.id, token);
-			cookies.set('token', token, { path: '/', httpOnly: !dev, secure: !dev });
-			redirect(303, resolve('/calendars'));
-		} else {
-			return fail(422, { message: 'Invalid credentials' });
-		}
-	}
-);
-
-export const logout = form(async () => {
-	const { cookies } = getRequestEvent();
-	cookies.delete('token', { path: '/' });
-	redirect(303, '/');
-});
+/**
+ * Legacy login form handler — REPLACED by better-auth.
+ *
+ * Sign-in is now handled at /api/auth/sign-in/username (POST JSON).
+ * The login UI at +page.svelte needs updating to call that endpoint.
+ * This file is kept as a placeholder until the UI is wired up.
+ *
+ * TODO (jj-cal-ruw8): Remove this file and update +page.svelte to POST
+ * to /api/auth/sign-in/username with { username, password } JSON body.
+ */
+export {};

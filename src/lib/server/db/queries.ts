@@ -1,34 +1,56 @@
-import { and, asc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, todosTable, usersTable } from './schema';
+import { calendarsTable, eventsTable, invitesTable, todosTable, usersTable } from './schema';
 
-export async function getUserByName(db: DrizzleClient, name: string) {
-	const user = await db.select().from(usersTable).where(eq(usersTable.name, name));
-	return user[0] ?? null;
+// ---------------------------------------------------------------------------
+// User management is now handled by better-auth. These helpers have been
+// removed: getUserByToken, getUserByName, setUserToken, createUser.
+// ---------------------------------------------------------------------------
+
+// jj-cal-4v2c / jj-cal-85er: fetch user display fields for colour-coding and assignee picker
+export async function getUsersBasic(db: DrizzleClient) {
+	const rows = await db.select().from(usersTable);
+	return rows.map((u) => ({
+		id: u.id,
+		name: u.name,
+		displayName: u.displayName,
+		colour: u.colour
+	}));
 }
 
-export async function getUserByToken(db: DrizzleClient, token: string) {
-	const user = await db.select().from(usersTable).where(eq(usersTable.token, token));
-	return user[0] ?? null;
-}
+// jj-cal-4rop: invite system
 
-export async function createUser(db: DrizzleClient, name: string) {
-	const user = await db.insert(usersTable).values({ name }).returning();
-	return user[0];
-}
-
-export async function setUserToken(db: DrizzleClient, user_id: number, token: string) {
-	const user = await db
-		.update(usersTable)
-		.set({ token })
-		.where(eq(usersTable.id, user_id))
+export async function createInvite(
+	db: DrizzleClient,
+	input: { id: string; token: string; createdById: string; createdAt: Date; expiresAt: Date }
+) {
+	const { id, token, createdById, createdAt, expiresAt } = input;
+	const rows = await db
+		.insert(invitesTable)
+		.values({ id, token, createdById, createdAt, expiresAt })
 		.returning();
-	return user[0];
+	return rows[0];
+}
+
+export async function getAllInvites(db: DrizzleClient) {
+	return db.select().from(invitesTable).orderBy(desc(invitesTable.createdAt));
+}
+
+export async function getInviteByToken(db: DrizzleClient, token: string) {
+	const rows = await db.select().from(invitesTable).where(eq(invitesTable.token, token));
+	return rows[0] ?? null;
+}
+
+export async function revokeInvite(db: DrizzleClient, id: string) {
+	await db
+		.update(invitesTable)
+		.set({ revokedAt: new Date() })
+		.where(eq(invitesTable.id, id));
 }
 
 export async function createCalendar(
 	db: DrizzleClient,
-	input: { name: string; slug: string; created_by_name: string; created_by_id: number }
+	input: { name: string; slug: string; created_by_name: string; created_by_id: string }
 ) {
 	const { name, slug, created_by_name, created_by_id } = input;
 	const calendar = await db
@@ -50,22 +72,25 @@ export async function getCalendarBySlug(db: DrizzleClient, slug: string) {
 
 export async function createEvent(
 	db: DrizzleClient,
-	input: { calendarSlug: string; datetime: number; text: string; name: string }
+	input: {
+		calendarSlug: string;
+		calendarId: number;
+		datetime: number;
+		text: string;
+		created_by_name: string;
+		created_by_id: string;
+	}
 ) {
-	const { datetime, text, name } = input;
-	const user = await getUserByName(db, name);
-	if (!user) throw 'User not found';
-	const calendar = await getCalendarBySlug(db, input.calendarSlug);
-	if (!calendar) throw 'Calendar not found';
+	const { calendarSlug, calendarId, datetime, text, created_by_name, created_by_id } = input;
 	const event = await db
 		.insert(eventsTable)
 		.values({
-			calendar_id: calendar.id,
-			calendar_slug: calendar.slug,
+			calendar_id: calendarId,
+			calendar_slug: calendarSlug,
 			datetime,
 			text,
-			created_by_name: user.name,
-			created_by_id: user.id
+			created_by_name,
+			created_by_id
 		})
 		.returning();
 	return event[0];
@@ -91,7 +116,14 @@ export async function getAllTodos(db: DrizzleClient) {
 
 export async function createTodo(
 	db: DrizzleClient,
-	input: { text: string; created_by_id: number; created_by_name: string; sort_order: number; due_date?: string | null }
+	input: {
+		text: string;
+		created_by_id: string;
+		created_by_name: string;
+		sort_order: number;
+		due_date?: string | null;
+		assignee_id?: string | null;
+	}
 ) {
 	const todo = await db
 		.insert(todosTable)

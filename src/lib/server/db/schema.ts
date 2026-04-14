@@ -1,9 +1,80 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
+// ---------------------------------------------------------------------------
+// Auth tables — managed by better-auth. Field names match better-auth's
+// default snake_case Drizzle schema. The JS export names follow our
+// *Table convention; we map them to better-auth's model names in auth.ts.
+// ---------------------------------------------------------------------------
+
 export const usersTable = sqliteTable('user', {
-	id: integer('id').primaryKey(),
+	id: text('id').primaryKey(),
 	name: text('name').notNull(),
-	token: text('token')
+	email: text('email').notNull().unique(),
+	emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+	image: text('image'),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+	// username plugin — allows sign-in by username instead of email
+	username: text('username').unique(),
+	displayUsername: text('display_username'),
+	// App-level fields
+	isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+	deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+	// jj-cal-aovo: profile fields
+	displayName: text('display_name'),
+	colour: text('colour')  // CSS variable suffix, e.g. "family-3" → var(--color-family-3)
+});
+
+export const sessionsTable = sqliteTable('session', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => usersTable.id, { onDelete: 'cascade' }),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+	token: text('token').notNull().unique(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+	ipAddress: text('ip_address'),
+	userAgent: text('user_agent')
+});
+
+export const accountsTable = sqliteTable('account', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => usersTable.id, { onDelete: 'cascade' }),
+	accountId: text('account_id').notNull(),
+	providerId: text('provider_id').notNull(),
+	accessToken: text('access_token'),
+	refreshToken: text('refresh_token'),
+	idToken: text('id_token'),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }),
+	password: text('password'),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});
+
+export const verificationsTable = sqliteTable('verification', {
+	id: text('id').primaryKey(),
+	identifier: text('identifier').notNull(),
+	value: text('value').notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }),
+	updatedAt: integer('updated_at', { mode: 'timestamp' })
+});
+
+// ---------------------------------------------------------------------------
+// App tables
+// ---------------------------------------------------------------------------
+
+// jj-cal-4rop: invite system
+export const invitesTable = sqliteTable('invite', {
+	id: text('id').primaryKey(),
+	token: text('token').notNull().unique(),
+	createdById: text('created_by_id').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+	revokedAt: integer('revoked_at', { mode: 'timestamp' })
 });
 
 export const calendarsTable = sqliteTable('calendar', {
@@ -11,7 +82,7 @@ export const calendarsTable = sqliteTable('calendar', {
 	name: text('name').notNull().unique(),
 	slug: text('slug').notNull().unique(),
 	created_by_name: text('created_by_name').notNull(),
-	created_by_id: integer('created_by_id').notNull()
+	created_by_id: text('created_by_id').notNull()
 });
 
 export const eventsTable = sqliteTable('event', {
@@ -21,7 +92,7 @@ export const eventsTable = sqliteTable('event', {
 	datetime: integer('datetime').notNull(),
 	text: text('text').notNull(),
 	created_by_name: text('created_by_name').notNull(),
-	created_by_id: integer('created_by_id').notNull()
+	created_by_id: text('created_by_id').notNull()
 });
 
 export const todosTable = sqliteTable('todo', {
@@ -33,5 +104,7 @@ export const todosTable = sqliteTable('todo', {
 	sort_order: integer('sort_order').notNull().default(0),
 	created_at: integer('created_at').notNull(),
 	created_by_name: text('created_by_name').notNull(),
-	created_by_id: integer('created_by_id').notNull()
+	created_by_id: text('created_by_id').notNull(),
+	// jj-cal-85er: optional assignee (references usersTable.id)
+	assignee_id: text('assignee_id')
 });

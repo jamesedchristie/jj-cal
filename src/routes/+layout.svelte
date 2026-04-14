@@ -6,10 +6,10 @@
 	import Button from '$lib/components/Button.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import FAB from '$lib/components/FAB.svelte';
+	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import type { Snippet } from 'svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
-	import { logout } from './login.remote';
 	import { setToastService, ToastService } from '$lib/components/toast/toastService.svelte';
 	import Toast from '$lib/components/toast/Toast.svelte';
 
@@ -46,9 +46,19 @@
 			<h1>JJ Cal</h1>
 		</a>
 		<div class="header-right">
-			<span>Logged in as: {data.user?.name ?? 'Not logged in'}</span>
 			{#if data.user}
-				<form {...logout}>
+				{#if data.user.isAdmin}
+					<a href={resolve('/admin/invites')} class="admin-link">Invites</a>
+				{/if}
+				<a href={resolve('/profile')} class="profile-link" aria-label="Edit profile">
+					<UserAvatar
+						name={data.user.name}
+						displayName={data.user.displayName}
+						colour={data.user.colour}
+						size="sm"
+					/>
+				</a>
+				<form method="post" action="/api/auth/sign-out">
 					<Button type="submit">Logout</Button>
 				</form>
 			{/if}
@@ -68,23 +78,37 @@
 		flex-direction: column;
 		overflow: hidden;
 	}
+
 	header {
 		flex: none;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 1rem;
+		padding: var(--space-4);
+
 		a {
 			text-decoration: none;
 			color: inherit;
 		}
-		& .header-right {
-			display: flex;
-			justify-content: flex-end;
-			align-items: center;
-			gap: 1rem;
-		}
 	}
+
+	.header-right {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.admin-link {
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-muted);
+	}
+
+	.profile-link {
+		display: flex;
+		align-items: center;
+	}
+
 	main {
 		flex: auto;
 		display: flex;

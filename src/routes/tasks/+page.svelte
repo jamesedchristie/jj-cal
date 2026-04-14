@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { addTodo, getTodos, removeTodo, toggleTodo } from './data.remote';
+	import UserAvatar from '$lib/components/UserAvatar.svelte';
+	import { addTodo, getTodos, getUsers, removeTodo, toggleTodo } from './data.remote';
 
 	const incomplete = $derived((await getTodos()).filter((t) => !t.completed));
 	const complete = $derived((await getTodos()).filter((t) => t.completed));
+	const users = $derived(await getUsers());
 
 	// Today's date in Sydney time as YYYY-MM-DD
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
+
+	let selectedAssigneeId = $state<string | null>(null);
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -18,6 +22,11 @@
 		if (due === today) return 'today';
 		return 'upcoming';
 	}
+
+	function userById(id: string | null) {
+		if (!id) return null;
+		return users.find((u) => u.id === id) ?? null;
+	}
 </script>
 
 <div class="page">
@@ -27,6 +36,7 @@
 		{...addTodo.enhance(async ({ form, submit }) => {
 			await submit();
 			form.reset();
+			selectedAssigneeId = null;
 		})}
 		class="add-form"
 	>
@@ -43,6 +53,34 @@
 				</svg>
 			</button>
 		</div>
+
+		{#if users.length > 0}
+			<div class="add-meta add-assignee">
+				<input {...addTodo.fields.assignee_id.as('hidden', selectedAssigneeId ?? '')} />
+				<span class="meta-label">Assign to</span>
+				<div class="assignee-row">
+					{#each users as u (u.id)}
+						<button
+							type="button"
+							class="assignee-btn"
+							class:selected={selectedAssigneeId === u.id}
+							title={u.displayName ?? u.name}
+							onclick={() => {
+								selectedAssigneeId = selectedAssigneeId === u.id ? null : u.id;
+							}}
+						>
+							<UserAvatar
+								name={u.name}
+								displayName={u.displayName}
+								colour={u.colour}
+								size="sm"
+							/>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<div class="add-meta">
 			<label class="due-label">
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -58,13 +96,14 @@
 
 	<ul class="todo-list">
 		{#each incomplete as todo (todo.id)}
-			{@const toggle = toggleTodo.for(todo.id)}
-			{@const remove = removeTodo.for(todo.id)}
+			{@const toggle = toggleTodo.for(String(todo.id))}
+			{@const remove = removeTodo.for(String(todo.id))}
 			{@const status = todo.due_date ? dueDateStatus(todo.due_date) : null}
+			{@const assignee = userById(todo.assignee_id ?? null)}
 			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
 				<form {...toggle}>
-					<input type="hidden" {...toggle.fields.id.as('hidden', String(todo.id))} />
-					<input type="hidden" {...toggle.fields.completed.as('hidden', 'true')} />
+					<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+					<input {...toggle.fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<circle cx="12" cy="12" r="10"/>
@@ -75,8 +114,18 @@
 				{#if todo.due_date}
 					<span class="due-chip {status}">{formatDueDate(todo.due_date)}</span>
 				{/if}
+				{#if assignee}
+					<span class="assignee-chip">
+						<UserAvatar
+							name={assignee.name}
+							displayName={assignee.displayName}
+							colour={assignee.colour}
+							size="sm"
+						/>
+					</span>
+				{/if}
 				<form {...remove}>
-					<input type="hidden" {...remove.fields.id.as('hidden', String(todo.id))} />
+					<input {...remove.fields.id.as('hidden', String(todo.id))} />
 					<button type="submit" class="delete" aria-label="Delete task">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<line x1="18" y1="6" x2="6" y2="18"/>
@@ -95,10 +144,11 @@
 				{#each complete as todo (todo.id)}
 					{@const toggle = toggleTodo.for(`uncomplete-${todo.id}`)}
 					{@const remove = removeTodo.for(`done-${todo.id}`)}
+					{@const assignee = userById(todo.assignee_id ?? null)}
 					<li>
 						<form {...toggle}>
-							<input type="hidden" {...toggle.fields.id.as('hidden', String(todo.id))} />
-							<input type="hidden" {...toggle.fields.completed.as('hidden', 'false')} />
+							<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+							<input {...toggle.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10"/>
@@ -107,8 +157,18 @@
 							</button>
 						</form>
 						<span class="text">{todo.text}</span>
+						{#if assignee}
+							<span class="assignee-chip">
+								<UserAvatar
+									name={assignee.name}
+									displayName={assignee.displayName}
+									colour={assignee.colour}
+									size="sm"
+								/>
+							</span>
+						{/if}
 						<form {...remove}>
-							<input type="hidden" {...remove.fields.id.as('hidden', String(todo.id))} />
+							<input {...remove.fields.id.as('hidden', String(todo.id))} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18"/>
@@ -133,8 +193,10 @@
 
 	h1 {
 		flex: none;
-		padding: 1rem 1rem 0.5rem;
-		font-size: 1.4rem;
+		padding: var(--space-4) var(--space-4) var(--space-2);
+		font-size: var(--font-size-lg);
+		font-family: var(--font-heading);
+		font-weight: var(--font-weight-bold);
 	}
 
 	.add-form {
@@ -142,11 +204,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		margin: 0 1rem 1rem;
-		border: 1.5px solid #e5e7eb;
-		border-radius: 10px;
+		margin: 0 var(--space-4) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: #fff;
+		background: var(--color-surface);
 	}
 
 	.add-row {
@@ -156,59 +218,108 @@
 			flex: 1;
 			border: none;
 			outline: none;
-			padding: 0.75rem 1rem;
-			font-size: 1rem;
+			padding: var(--space-3) var(--space-4);
+			font-size: var(--font-size-base);
+			font-family: var(--font-body);
 			background: transparent;
+			color: var(--color-text);
+
+			&::placeholder {
+				color: var(--color-text-subtle);
+			}
 		}
 
 		button {
 			flex: none;
-			background: #111827;
+			background: var(--color-primary);
 			border: none;
-			color: #fff;
-			width: 44px;
+			color: var(--color-primary-text);
+			width: var(--space-10);
 			cursor: pointer;
 			display: flex;
 			align-items: center;
 			justify-content: center;
+			transition: background var(--duration-fast) var(--ease-standard);
 
 			svg {
-				width: 18px;
-				height: 18px;
+				width: var(--size-icon-sm);
+				height: var(--size-icon-sm);
 			}
 
 			&:active {
-				background: #374151;
+				background: var(--color-primary-hover);
 			}
 		}
 	}
 
 	.add-meta {
-		border-top: 1px solid #f3f4f6;
-		padding: 0.4rem 0.75rem;
+		border-top: 1px solid var(--color-border-subtle);
+		padding: var(--space-1) var(--space-3);
 		display: flex;
-		gap: 0.5rem;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.add-assignee {
+		padding: var(--space-2) var(--space-3);
+	}
+
+	.meta-label {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-subtle);
+		white-space: nowrap;
+	}
+
+	.assignee-row {
+		display: flex;
+		gap: var(--space-1);
+		flex-wrap: wrap;
+	}
+
+	.assignee-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		border-radius: var(--radius-full);
+		outline: none;
+		opacity: 0.5;
+		transition: opacity var(--duration-fast) var(--ease-standard),
+			box-shadow var(--duration-fast) var(--ease-standard);
+
+		&:hover {
+			opacity: 0.85;
+		}
+
+		&.selected {
+			opacity: 1;
+			box-shadow: 0 0 0 2px var(--color-text);
+			border-radius: var(--radius-full);
+		}
 	}
 
 	.due-label {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		color: #9ca3af;
-		font-size: 0.8rem;
+		gap: var(--space-1);
+		color: var(--color-text-subtle);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
 		cursor: pointer;
 
 		svg {
-			width: 14px;
-			height: 14px;
+			width: var(--size-icon-sm);
+			height: var(--size-icon-sm);
 			flex: none;
 		}
 
 		input[type='date'] {
 			border: none;
 			outline: none;
-			font-size: 0.8rem;
-			color: #6b7280;
+			font-size: var(--font-size-xs);
+			font-family: var(--font-body);
+			color: var(--color-text-muted);
 			background: transparent;
 			cursor: pointer;
 			padding: 0;
@@ -222,7 +333,7 @@
 	.todo-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0 1rem;
+		padding: 0 var(--space-4);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -230,10 +341,10 @@
 		li {
 			display: flex;
 			align-items: center;
-			gap: 0.5rem;
-			padding: 0.6rem 0.5rem;
-			border-radius: 8px;
-			transition: opacity 0.15s ease;
+			gap: var(--space-2);
+			padding: var(--space-2);
+			border-radius: var(--radius-md);
+			transition: opacity var(--duration-fast) var(--ease-standard);
 
 			&.pending {
 				opacity: 0.4;
@@ -247,66 +358,76 @@
 		border: none;
 		padding: 0;
 		cursor: pointer;
-		color: #d1d5db;
+		color: var(--color-border-strong);
 		display: flex;
 		align-items: center;
-		transition: color 0.15s ease;
+		transition: color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 24px;
-			height: 24px;
+			width: var(--space-6);
+			height: var(--space-6);
 		}
 
 		&:hover {
-			color: #6b7280;
+			color: var(--color-text-muted);
 		}
 
 		&.done {
-			color: #10b981;
+			color: var(--color-success);
 
 			&:hover {
-				color: #059669;
+				color: var(--color-accent);
 			}
 		}
 	}
 
 	.text {
 		flex: 1;
-		font-size: 1rem;
-		line-height: 1.4;
+		font-size: var(--font-size-base);
+		font-family: var(--font-body);
+		line-height: var(--line-height-normal);
+		color: var(--color-text);
 
 		.completed & {
 			text-decoration: line-through;
-			color: #9ca3af;
+			color: var(--color-text-subtle);
 		}
 	}
 
 	.due-chip {
 		flex: none;
-		font-size: 0.72rem;
-		font-weight: 500;
-		padding: 0.2rem 0.45rem;
-		border-radius: 4px;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
 		white-space: nowrap;
 
 		&.overdue {
-			background: #fef2f2;
-			color: #dc2626;
+			background: var(--color-danger-bg);
+			color: var(--color-danger-text);
 		}
 
 		&.today {
-			background: #fffbeb;
-			color: #d97706;
+			background: var(--color-warning-bg);
+			color: var(--color-warning-text);
 		}
 
 		&.upcoming {
-			background: #f3f4f6;
-			color: #6b7280;
+			background: var(--color-surface-sunken);
+			color: var(--color-text-muted);
 		}
 	}
 
+	.assignee-chip {
+		flex: none;
+		display: flex;
+		align-items: center;
+	}
+
 	li.overdue > .check {
-		color: #fca5a5;
+		color: var(--color-danger);
+		opacity: 0.6;
 	}
 
 	.delete {
@@ -315,19 +436,20 @@
 		border: none;
 		padding: 0;
 		cursor: pointer;
-		color: #e5e7eb;
+		color: var(--color-border);
 		display: flex;
 		align-items: center;
 		opacity: 0;
-		transition: opacity 0.15s ease, color 0.15s ease;
+		transition: opacity var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 18px;
-			height: 18px;
+			width: var(--size-icon-sm);
+			height: var(--size-icon-sm);
 		}
 
 		&:hover {
-			color: #ef4444;
+			color: var(--color-danger);
 		}
 	}
 
@@ -338,13 +460,14 @@
 
 	.completed-section {
 		flex: none;
-		padding: 0.5rem 1rem 1rem;
+		padding: var(--space-2) var(--space-4) var(--space-4);
 
 		summary {
 			cursor: pointer;
-			font-size: 0.85rem;
-			color: #9ca3af;
-			padding: 0.5rem 0;
+			font-size: var(--font-size-sm);
+			font-family: var(--font-body);
+			color: var(--color-text-subtle);
+			padding: var(--space-2) 0;
 			user-select: none;
 		}
 
@@ -352,7 +475,7 @@
 			flex: none;
 			overflow: visible;
 			padding: 0;
-			margin-top: 0.25rem;
+			margin-top: var(--space-1);
 		}
 	}
 </style>

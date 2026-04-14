@@ -1,5 +1,5 @@
 import { form, getRequestEvent, query } from '$app/server';
-import { createTodo, deleteTodo, getAllTodos, setTodoCompleted } from '$lib/server/db/queries';
+import { createTodo, deleteTodo, getAllTodos, getUsersBasic, setTodoCompleted } from '$lib/server/db/queries';
 import * as v from 'valibot';
 
 export const getTodos = query(async () => {
@@ -7,12 +7,18 @@ export const getTodos = query(async () => {
 	return getAllTodos(locals.db);
 });
 
+export const getUsers = query(async () => {
+	const { locals } = getRequestEvent();
+	return getUsersBasic(locals.db);
+});
+
 export const addTodo = form(
 	v.object({
 		text: v.pipe(v.string(), v.nonEmpty()),
-		due_date: v.pipe(v.string(), v.transform((s) => s || null))
+		due_date: v.pipe(v.string(), v.transform((s) => s || null)),
+		assignee_id: v.pipe(v.string(), v.transform((s) => s || null))
 	}),
-	async ({ text, due_date }) => {
+	async ({ text, due_date, assignee_id }) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await createTodo(locals.db, {
@@ -20,7 +26,8 @@ export const addTodo = form(
 			created_by_id: locals.user.id,
 			created_by_name: locals.user.name,
 			sort_order: Date.now(),
-			due_date
+			due_date,
+			assignee_id
 		});
 		// Single-flight: refresh the query as part of this same request
 		void getTodos().refresh();
