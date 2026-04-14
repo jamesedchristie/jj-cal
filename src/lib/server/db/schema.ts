@@ -16,7 +16,10 @@ export const usersTable = sqliteTable('user', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 	// username plugin — allows sign-in by username instead of email
 	username: text('username').unique(),
-	displayUsername: text('display_username')
+	displayUsername: text('display_username'),
+	// App-level fields
+	isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+	deletedAt: integer('deleted_at', { mode: 'timestamp' })
 });
 
 export const sessionsTable = sqliteTable('session', {

@@ -29,7 +29,6 @@ export function createAuth(db: DrizzleClient) {
 
 		plugins: [
 			username({
-				// Allow sign-in by username only (no display-username collision check needed yet)
 				minUsernameLength: 2,
 				maxUsernameLength: 50
 			})
@@ -42,6 +41,24 @@ export function createAuth(db: DrizzleClient) {
 			// No email verification — we have no email transport.
 			requireEmailVerification: false,
 			autoSignIn: true
+		},
+
+		// Declare app-level custom fields so better-auth includes them in the
+		// session user object and validates them on create/update.
+		user: {
+			additionalFields: {
+				isAdmin: {
+					type: 'boolean',
+					required: false,
+					defaultValue: false,
+					input: false // not settable by the user themselves
+				},
+				deletedAt: {
+					type: 'date',
+					required: false,
+					input: false
+				}
+			}
 		},
 
 		session: {
