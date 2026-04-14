@@ -13,7 +13,7 @@ A shared family planning and admin app for couples and households. Started as a 
 
 - **Mobile-first** — designed for the phone you always have in your hand
 - **Fast and app-like** — PWA with native feel, bottom nav, smooth transitions
-- **Shared by default, personal when needed** — items can be family-wide or personal
+- **Explicit sharing** — every calendar, list, and resource is owned by its creator and shared with specific people at a chosen permission level. No global "everyone sees everything" visibility.
 - **Low friction** — quick-add for the most common actions, minimal taps to get things done
 
 ## Feature areas
@@ -55,9 +55,10 @@ A shared family planning and admin app for couples and households. Started as a 
 - No bank integrations — manual entry, kept simple
 
 ### 7. Family Profiles & Multi-user
-- Each family member has a profile with a color
-- Invite system (email link)
-- Role-based: admin (full access), member (standard), viewer (read-only for grandparents etc.)
+- Each family member has a profile with a color, used throughout the app for identification and assignment
+- Profiles are always backed by a real user account — no "ghost" profiles for non-logged-in members
+- Invite system via shareable link or QR code (no email sending — invites are shared out-of-band via WhatsApp/iMessage/in person)
+- Single admin-style elevated role for user management (inviting, removing users, resetting passwords). Per-resource permissions (viewer/editor) are orthogonal and apply to anything shared with you
 
 ### 8. Quick Reference / Info
 - Emergency contacts
