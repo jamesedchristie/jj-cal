@@ -19,7 +19,10 @@ export const usersTable = sqliteTable('user', {
 	displayUsername: text('display_username'),
 	// App-level fields
 	isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
-	deletedAt: integer('deleted_at', { mode: 'timestamp' })
+	deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+	// jj-cal-aovo: profile fields
+	displayName: text('display_name'),
+	colour: text('colour')  // CSS variable suffix, e.g. "family-3" → var(--color-family-3)
 });
 
 export const sessionsTable = sqliteTable('session', {

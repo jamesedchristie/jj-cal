@@ -58,6 +58,20 @@
 	--color-overlay: rgba(0, 0, 0, 0.4);
 
 	/* ------------------------------------------------------------------ */
+	/* Colour — family member palette (jj-cal-aovo)                        */
+	/* Used for avatars, event tints, assignee chips, etc.                 */
+	/* Text on these is always var(--color-text-inverse).                  */
+	/* ------------------------------------------------------------------ */
+	--color-family-1: #ef4444;  /* red    */
+	--color-family-2: #f97316;  /* orange */
+	--color-family-3: #eab308;  /* amber  */
+	--color-family-4: #22c55e;  /* green  */
+	--color-family-5: #14b8a6;  /* teal   */
+	--color-family-6: #3b82f6;  /* blue   */
+	--color-family-7: #a855f7;  /* violet */
+	--color-family-8: #ec4899;  /* pink   */
+
+	/* ------------------------------------------------------------------ */
 	/* Typography                                                          */
 	/* ------------------------------------------------------------------ */
 	--font-body:
@@ -206,6 +220,16 @@
 
 		--color-focus-ring: #60a5fa;
 		--color-overlay: rgba(0, 0, 0, 0.7);
+
+		/* Family palette — same hues, slightly brighter for dark surfaces */
+		--color-family-1: #f87171;
+		--color-family-2: #fb923c;
+		--color-family-3: #fbbf24;
+		--color-family-4: #4ade80;
+		--color-family-5: #2dd4bf;
+		--color-family-6: #60a5fa;
+		--color-family-7: #c084fc;
+		--color-family-8: #f472b6;
 
 		/* Shadows — deeper for dark backgrounds */
 		--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);

@@ -1,24 +1,39 @@
 <script lang="ts">
+	/**
+	 * NameTag — inline name badge used in calendar event lists.
+	 *
+	 * Accepts an optional `colour` prop (CSS variable suffix, e.g. "family-3").
+	 * Falls back to --color-surface-sunken when no colour is set.
+	 */
 	interface Props {
 		name: string;
+		colour?: string | null;
 	}
 
-	let { name }: Props = $props();
+	let { name, colour }: Props = $props();
 
-	const NameColours = {
-		Jim: 'lightblue',
-		Jasmin: 'lightgreen'
-	};
-
-	let color = $derived(NameColours[name as keyof typeof NameColours] || 'lightgray');
+	const colorValue = $derived(
+		colour ? `var(--color-${colour})` : 'var(--color-surface-sunken)'
+	);
+	const textValue = $derived(
+		colour ? 'var(--color-text-inverse)' : 'var(--color-text-muted)'
+	);
 </script>
 
-<span style:background-color={color}>{name}</span>
+<span class="name-tag" style:--tag-bg={colorValue} style:--tag-text={textValue}>
+	{name}
+</span>
 
 <style>
-	span {
-		padding: 2px 4px;
-		border-radius: 4px;
-		font-size: 10px;
+	.name-tag {
+		display: inline-block;
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
+		background-color: var(--tag-bg);
+		color: var(--tag-text);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		white-space: nowrap;
 	}
 </style>

@@ -57,6 +57,18 @@ export function createAuth(db: DrizzleClient) {
 					type: 'date',
 					required: false,
 					input: false
+				},
+				// jj-cal-aovo: profile fields
+				displayName: {
+					type: 'string',
+					required: false,
+					input: true
+				},
+				colour: {
+					// CSS variable suffix, e.g. "family-3" → var(--color-family-3)
+					type: 'string',
+					required: false,
+					input: true
 				}
 			}
 		},
