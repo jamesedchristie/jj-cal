@@ -104,5 +104,7 @@ export const todosTable = sqliteTable('todo', {
 	sort_order: integer('sort_order').notNull().default(0),
 	created_at: integer('created_at').notNull(),
 	created_by_name: text('created_by_name').notNull(),
-	created_by_id: text('created_by_id').notNull()
+	created_by_id: text('created_by_id').notNull(),
+	// jj-cal-85er: optional assignee (references usersTable.id)
+	assignee_id: text('assignee_id')
 });

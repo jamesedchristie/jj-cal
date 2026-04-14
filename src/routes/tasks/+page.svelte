@@ -1,11 +1,15 @@
 <script lang="ts">
-	import { addTodo, getTodos, removeTodo, toggleTodo } from './data.remote';
+	import UserAvatar from '$lib/components/UserAvatar.svelte';
+	import { addTodo, getTodos, getUsers, removeTodo, toggleTodo } from './data.remote';
 
 	const incomplete = $derived((await getTodos()).filter((t) => !t.completed));
 	const complete = $derived((await getTodos()).filter((t) => t.completed));
+	const users = $derived(await getUsers());
 
 	// Today's date in Sydney time as YYYY-MM-DD
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
+
+	let selectedAssigneeId = $state<string | null>(null);
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -18,6 +22,11 @@
 		if (due === today) return 'today';
 		return 'upcoming';
 	}
+
+	function userById(id: string | null) {
+		if (!id) return null;
+		return users.find((u) => u.id === id) ?? null;
+	}
 </script>
 
 <div class="page">
@@ -27,6 +36,7 @@
 		{...addTodo.enhance(async ({ form, submit }) => {
 			await submit();
 			form.reset();
+			selectedAssigneeId = null;
 		})}
 		class="add-form"
 	>
@@ -43,6 +53,34 @@
 				</svg>
 			</button>
 		</div>
+
+		{#if users.length > 0}
+			<div class="add-meta add-assignee">
+				<input {...addTodo.fields.assignee_id.as('hidden', selectedAssigneeId ?? '')} />
+				<span class="meta-label">Assign to</span>
+				<div class="assignee-row">
+					{#each users as u (u.id)}
+						<button
+							type="button"
+							class="assignee-btn"
+							class:selected={selectedAssigneeId === u.id}
+							title={u.displayName ?? u.name}
+							onclick={() => {
+								selectedAssigneeId = selectedAssigneeId === u.id ? null : u.id;
+							}}
+						>
+							<UserAvatar
+								name={u.name}
+								displayName={u.displayName}
+								colour={u.colour}
+								size="sm"
+							/>
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<div class="add-meta">
 			<label class="due-label">
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -61,6 +99,7 @@
 			{@const toggle = toggleTodo.for(String(todo.id))}
 			{@const remove = removeTodo.for(String(todo.id))}
 			{@const status = todo.due_date ? dueDateStatus(todo.due_date) : null}
+			{@const assignee = userById(todo.assignee_id ?? null)}
 			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
 				<form {...toggle}>
 					<input {...toggle.fields.id.as('hidden', String(todo.id))} />
@@ -74,6 +113,16 @@
 				<span class="text">{todo.text}</span>
 				{#if todo.due_date}
 					<span class="due-chip {status}">{formatDueDate(todo.due_date)}</span>
+				{/if}
+				{#if assignee}
+					<span class="assignee-chip">
+						<UserAvatar
+							name={assignee.name}
+							displayName={assignee.displayName}
+							colour={assignee.colour}
+							size="sm"
+						/>
+					</span>
 				{/if}
 				<form {...remove}>
 					<input {...remove.fields.id.as('hidden', String(todo.id))} />
@@ -95,6 +144,7 @@
 				{#each complete as todo (todo.id)}
 					{@const toggle = toggleTodo.for(`uncomplete-${todo.id}`)}
 					{@const remove = removeTodo.for(`done-${todo.id}`)}
+					{@const assignee = userById(todo.assignee_id ?? null)}
 					<li>
 						<form {...toggle}>
 							<input {...toggle.fields.id.as('hidden', String(todo.id))} />
@@ -107,6 +157,16 @@
 							</button>
 						</form>
 						<span class="text">{todo.text}</span>
+						{#if assignee}
+							<span class="assignee-chip">
+								<UserAvatar
+									name={assignee.name}
+									displayName={assignee.displayName}
+									colour={assignee.colour}
+									size="sm"
+								/>
+							</span>
+						{/if}
 						<form {...remove}>
 							<input {...remove.fields.id.as('hidden', String(todo.id))} />
 							<button type="submit" class="delete" aria-label="Delete task">
@@ -196,7 +256,47 @@
 		border-top: 1px solid var(--color-border-subtle);
 		padding: var(--space-1) var(--space-3);
 		display: flex;
+		align-items: center;
 		gap: var(--space-2);
+	}
+
+	.add-assignee {
+		padding: var(--space-2) var(--space-3);
+	}
+
+	.meta-label {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-subtle);
+		white-space: nowrap;
+	}
+
+	.assignee-row {
+		display: flex;
+		gap: var(--space-1);
+		flex-wrap: wrap;
+	}
+
+	.assignee-btn {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		border-radius: var(--radius-full);
+		outline: none;
+		opacity: 0.5;
+		transition: opacity var(--duration-fast) var(--ease-standard),
+			box-shadow var(--duration-fast) var(--ease-standard);
+
+		&:hover {
+			opacity: 0.85;
+		}
+
+		&.selected {
+			opacity: 1;
+			box-shadow: 0 0 0 2px var(--color-text);
+			border-radius: var(--radius-full);
+		}
 	}
 
 	.due-label {
@@ -242,7 +342,7 @@
 			display: flex;
 			align-items: center;
 			gap: var(--space-2);
-			padding: var(--space-2) var(--space-2);
+			padding: var(--space-2);
 			border-radius: var(--radius-md);
 			transition: opacity var(--duration-fast) var(--ease-standard);
 
@@ -317,6 +417,12 @@
 			background: var(--color-surface-sunken);
 			color: var(--color-text-muted);
 		}
+	}
+
+	.assignee-chip {
+		flex: none;
+		display: flex;
+		align-items: center;
 	}
 
 	li.overdue > .check {

@@ -7,10 +7,15 @@ import { calendarsTable, eventsTable, invitesTable, todosTable, usersTable } fro
 // removed: getUserByToken, getUserByName, setUserToken, createUser.
 // ---------------------------------------------------------------------------
 
-// jj-cal-4v2c: event colour-coding — fetch just the fields needed for display
+// jj-cal-4v2c / jj-cal-85er: fetch user display fields for colour-coding and assignee picker
 export async function getUsersBasic(db: DrizzleClient) {
 	const rows = await db.select().from(usersTable);
-	return rows.map((u) => ({ id: u.id, colour: u.colour }));
+	return rows.map((u) => ({
+		id: u.id,
+		name: u.name,
+		displayName: u.displayName,
+		colour: u.colour
+	}));
 }
 
 // jj-cal-4rop: invite system
@@ -111,7 +116,14 @@ export async function getAllTodos(db: DrizzleClient) {
 
 export async function createTodo(
 	db: DrizzleClient,
-	input: { text: string; created_by_id: string; created_by_name: string; sort_order: number; due_date?: string | null }
+	input: {
+		text: string;
+		created_by_id: string;
+		created_by_name: string;
+		sort_order: number;
+		due_date?: string | null;
+		assignee_id?: string | null;
+	}
 ) {
 	const todo = await db
 		.insert(todosTable)
