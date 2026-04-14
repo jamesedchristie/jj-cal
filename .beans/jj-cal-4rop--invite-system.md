@@ -1,7 +1,7 @@
 ---
 # jj-cal-4rop
 title: Invite system
-status: todo
+status: done
 type: feature
 created_at: 2026-04-12T06:19:59Z
 updated_at: 2026-04-12T12:00:00Z
