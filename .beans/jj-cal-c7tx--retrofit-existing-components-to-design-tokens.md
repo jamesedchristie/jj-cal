@@ -1,7 +1,7 @@
 ---
 # jj-cal-c7tx
 title: Retrofit existing components to design tokens
-status: todo
+status: done
 type: chore
 created_at: 2026-04-12T12:00:00Z
 updated_at: 2026-04-12T12:00:00Z

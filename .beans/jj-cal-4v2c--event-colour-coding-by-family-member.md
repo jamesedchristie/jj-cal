@@ -1,7 +1,7 @@
 ---
 # jj-cal-4v2c
 title: Event colour-coding by family member
-status: todo
+status: done
 type: feature
 created_at: 2026-04-12T06:20:04Z
 updated_at: 2026-04-12T06:20:04Z
