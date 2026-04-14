@@ -1,7 +1,7 @@
 ---
 # jj-cal-85er
 title: Assign todos to family members
-status: todo
+status: done
 type: feature
 created_at: 2026-04-12T06:20:09Z
 updated_at: 2026-04-12T06:20:09Z
