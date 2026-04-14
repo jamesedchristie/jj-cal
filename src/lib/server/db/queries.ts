@@ -1,11 +1,17 @@
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, invitesTable, todosTable } from './schema';
+import { calendarsTable, eventsTable, invitesTable, todosTable, usersTable } from './schema';
 
 // ---------------------------------------------------------------------------
 // User management is now handled by better-auth. These helpers have been
 // removed: getUserByToken, getUserByName, setUserToken, createUser.
 // ---------------------------------------------------------------------------
+
+// jj-cal-4v2c: event colour-coding — fetch just the fields needed for display
+export async function getUsersBasic(db: DrizzleClient) {
+	const rows = await db.select().from(usersTable);
+	return rows.map((u) => ({ id: u.id, colour: u.colour }));
+}
 
 // jj-cal-4rop: invite system
 

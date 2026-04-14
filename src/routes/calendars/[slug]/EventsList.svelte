@@ -5,9 +5,10 @@
 
 	interface Props {
 		events: CalendarEvent[];
+		colourOf?: (id: string) => string | null;
 	}
 
-	let { events }: Props = $props();
+	let { events, colourOf }: Props = $props();
 
 	let ul = $state<HTMLUListElement>();
 
@@ -22,7 +23,9 @@
 <ul bind:this={ul} class={{ list: displayMode === 'list', summary: displayMode === 'summary' }}>
 	{#each events as event (event.id)}
 		<li class="event" animate:flip>
-			<span class="event-name"><NameTag name={event.created_by_name} /></span>
+			<span class="event-name">
+				<NameTag name={event.created_by_name} colour={colourOf?.(event.created_by_id) ?? null} />
+			</span>
 			<span class="event-text">{event.text}</span>
 		</li>
 	{/each}
@@ -33,21 +36,14 @@
 		max-height: 100%;
 		display: flex;
 		flex-direction: column;
-		gap: 5px;
+		gap: var(--space-1);
 		overflow: hidden;
 		&.summary {
-			/* flex-direction: row;
-			flex-wrap: wrap;
-			justify-content: center;
-			align-items: center; */
 			& li {
 				white-space: nowrap;
 				overflow: hidden;
 				text-overflow: ellipsis;
 			}
-			/* & .event-text {
-				display: none;
-			} */
 		}
 	}
 </style>

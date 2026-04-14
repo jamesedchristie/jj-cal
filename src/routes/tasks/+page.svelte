@@ -133,8 +133,10 @@
 
 	h1 {
 		flex: none;
-		padding: 1rem 1rem 0.5rem;
-		font-size: 1.4rem;
+		padding: var(--space-4) var(--space-4) var(--space-2);
+		font-size: var(--font-size-lg);
+		font-family: var(--font-heading);
+		font-weight: var(--font-weight-bold);
 	}
 
 	.add-form {
@@ -142,11 +144,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		margin: 0 1rem 1rem;
-		border: 1.5px solid #e5e7eb;
-		border-radius: 10px;
+		margin: 0 var(--space-4) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: #fff;
+		background: var(--color-surface);
 	}
 
 	.add-row {
@@ -156,59 +158,68 @@
 			flex: 1;
 			border: none;
 			outline: none;
-			padding: 0.75rem 1rem;
-			font-size: 1rem;
+			padding: var(--space-3) var(--space-4);
+			font-size: var(--font-size-base);
+			font-family: var(--font-body);
 			background: transparent;
+			color: var(--color-text);
+
+			&::placeholder {
+				color: var(--color-text-subtle);
+			}
 		}
 
 		button {
 			flex: none;
-			background: #111827;
+			background: var(--color-primary);
 			border: none;
-			color: #fff;
-			width: 44px;
+			color: var(--color-primary-text);
+			width: var(--space-10);
 			cursor: pointer;
 			display: flex;
 			align-items: center;
 			justify-content: center;
+			transition: background var(--duration-fast) var(--ease-standard);
 
 			svg {
-				width: 18px;
-				height: 18px;
+				width: var(--size-icon-sm);
+				height: var(--size-icon-sm);
 			}
 
 			&:active {
-				background: #374151;
+				background: var(--color-primary-hover);
 			}
 		}
 	}
 
 	.add-meta {
-		border-top: 1px solid #f3f4f6;
-		padding: 0.4rem 0.75rem;
+		border-top: 1px solid var(--color-border-subtle);
+		padding: var(--space-1) var(--space-3);
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--space-2);
 	}
 
 	.due-label {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		color: #9ca3af;
-		font-size: 0.8rem;
+		gap: var(--space-1);
+		color: var(--color-text-subtle);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
 		cursor: pointer;
 
 		svg {
-			width: 14px;
-			height: 14px;
+			width: var(--size-icon-sm);
+			height: var(--size-icon-sm);
 			flex: none;
 		}
 
 		input[type='date'] {
 			border: none;
 			outline: none;
-			font-size: 0.8rem;
-			color: #6b7280;
+			font-size: var(--font-size-xs);
+			font-family: var(--font-body);
+			color: var(--color-text-muted);
 			background: transparent;
 			cursor: pointer;
 			padding: 0;
@@ -222,7 +233,7 @@
 	.todo-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0 1rem;
+		padding: 0 var(--space-4);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -230,10 +241,10 @@
 		li {
 			display: flex;
 			align-items: center;
-			gap: 0.5rem;
-			padding: 0.6rem 0.5rem;
-			border-radius: 8px;
-			transition: opacity 0.15s ease;
+			gap: var(--space-2);
+			padding: var(--space-2) var(--space-2);
+			border-radius: var(--radius-md);
+			transition: opacity var(--duration-fast) var(--ease-standard);
 
 			&.pending {
 				opacity: 0.4;
@@ -247,66 +258,70 @@
 		border: none;
 		padding: 0;
 		cursor: pointer;
-		color: #d1d5db;
+		color: var(--color-border-strong);
 		display: flex;
 		align-items: center;
-		transition: color 0.15s ease;
+		transition: color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 24px;
-			height: 24px;
+			width: var(--space-6);
+			height: var(--space-6);
 		}
 
 		&:hover {
-			color: #6b7280;
+			color: var(--color-text-muted);
 		}
 
 		&.done {
-			color: #10b981;
+			color: var(--color-success);
 
 			&:hover {
-				color: #059669;
+				color: var(--color-accent);
 			}
 		}
 	}
 
 	.text {
 		flex: 1;
-		font-size: 1rem;
-		line-height: 1.4;
+		font-size: var(--font-size-base);
+		font-family: var(--font-body);
+		line-height: var(--line-height-normal);
+		color: var(--color-text);
 
 		.completed & {
 			text-decoration: line-through;
-			color: #9ca3af;
+			color: var(--color-text-subtle);
 		}
 	}
 
 	.due-chip {
 		flex: none;
-		font-size: 0.72rem;
-		font-weight: 500;
-		padding: 0.2rem 0.45rem;
-		border-radius: 4px;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
 		white-space: nowrap;
 
 		&.overdue {
-			background: #fef2f2;
-			color: #dc2626;
+			background: var(--color-danger-bg);
+			color: var(--color-danger-text);
 		}
 
 		&.today {
-			background: #fffbeb;
-			color: #d97706;
+			background: var(--color-warning-bg);
+			color: var(--color-warning-text);
 		}
 
 		&.upcoming {
-			background: #f3f4f6;
-			color: #6b7280;
+			background: var(--color-surface-sunken);
+			color: var(--color-text-muted);
 		}
 	}
 
 	li.overdue > .check {
-		color: #fca5a5;
+		color: var(--color-danger);
+		opacity: 0.6;
 	}
 
 	.delete {
@@ -315,19 +330,20 @@
 		border: none;
 		padding: 0;
 		cursor: pointer;
-		color: #e5e7eb;
+		color: var(--color-border);
 		display: flex;
 		align-items: center;
 		opacity: 0;
-		transition: opacity 0.15s ease, color 0.15s ease;
+		transition: opacity var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 18px;
-			height: 18px;
+			width: var(--size-icon-sm);
+			height: var(--size-icon-sm);
 		}
 
 		&:hover {
-			color: #ef4444;
+			color: var(--color-danger);
 		}
 	}
 
@@ -338,13 +354,14 @@
 
 	.completed-section {
 		flex: none;
-		padding: 0.5rem 1rem 1rem;
+		padding: var(--space-2) var(--space-4) var(--space-4);
 
 		summary {
 			cursor: pointer;
-			font-size: 0.85rem;
-			color: #9ca3af;
-			padding: 0.5rem 0;
+			font-size: var(--font-size-sm);
+			font-family: var(--font-body);
+			color: var(--color-text-subtle);
+			padding: var(--space-2) 0;
 			user-select: none;
 		}
 
@@ -352,7 +369,7 @@
 			flex: none;
 			overflow: visible;
 			padding: 0;
-			margin-top: 0.25rem;
+			margin-top: var(--space-1);
 		}
 	}
 </style>

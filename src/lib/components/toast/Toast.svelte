@@ -20,20 +20,22 @@
 		position: fixed;
 		top: 0;
 		right: 0;
-		padding: 2rem;
+		padding: var(--space-8);
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: var(--space-4);
 		pointer-events: none;
-		z-index: 99;
-		& article {
+		z-index: var(--z-toast);
+
+		article {
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			background-color: white;
-			padding: 1rem 2rem;
-			border: black;
-			box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.5);
+			background-color: var(--color-surface-raised);
+			color: var(--color-text);
+			padding: var(--space-4) var(--space-8);
+			border-radius: var(--radius-md);
+			box-shadow: var(--shadow-md);
 		}
 	}
 </style>

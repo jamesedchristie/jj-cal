@@ -31,24 +31,40 @@
 		display: inline-flex;
 		position: relative;
 	}
+
 	input {
 		display: block;
-		font-size: var(--input-font-size, 14px);
-		border: var(--input-border, 1px solid lightgray);
-		border-radius: var(--input-border-radius, 4px);
-		padding: var(--input-padding, 5px);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		color: var(--color-text);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		padding: var(--space-1) var(--space-2);
 		width: 100%;
-		height: var(--input-height, 30px);
+		height: var(--space-8);
+		outline: none;
+		transition: border-color var(--duration-fast) var(--ease-standard);
+
+		&:focus {
+			border-color: var(--color-focus-ring);
+		}
+
+		&::placeholder {
+			color: var(--color-text-subtle);
+		}
 	}
+
 	button.toggle-password {
 		position: absolute;
-		right: 5px;
+		right: var(--space-2);
 		top: 50%;
 		transform: translateY(-50%);
 		background: none;
 		border: none;
-		color: inherit;
+		color: var(--color-text-muted);
 		cursor: pointer;
-		font-size: 12px;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
 	}
 </style>

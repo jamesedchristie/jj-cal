@@ -4,6 +4,7 @@ import {
 	deleteEvent,
 	getCalendarBySlug,
 	getEventsForMonth,
+	getUsersBasic,
 	updateEventText
 } from '$lib/server/db/queries';
 import { error } from '@sveltejs/kit';
@@ -14,6 +15,12 @@ export const loadCalendar = query('unchecked', async (slug: string) => {
 	const calendar = await getCalendarBySlug(locals.db, slug);
 	if (!calendar) error(404, 'Calendar not found');
 	return calendar;
+});
+
+// jj-cal-4v2c: used to tint events with their creator's colour
+export const loadUserColours = query(async () => {
+	const { locals } = getRequestEvent();
+	return getUsersBasic(locals.db);
 });
 
 export const loadEvents = query('unchecked', async ({ calendarSlug, year, month }) => {

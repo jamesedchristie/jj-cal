@@ -51,9 +51,9 @@
 	.bottom-nav {
 		flex: none;
 		display: flex;
-		border-top: 1px solid #e5e7eb;
-		background: #fff;
-		padding-bottom: env(safe-area-inset-bottom, 0px);
+		border-top: 1px solid var(--color-border);
+		background: var(--color-surface);
+		padding-bottom: var(--safe-bottom);
 	}
 
 	.nav-item {
@@ -62,25 +62,25 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 3px;
-		padding: 10px 4px;
+		gap: var(--space-1);
+		padding: var(--space-2) var(--space-1);
 		text-decoration: none;
-		color: #9ca3af;
-		font-size: 11px;
-		font-weight: 500;
-		transition: color 0.15s ease;
+		color: var(--color-text-subtle);
+		font-size: var(--font-size-xs);
+		font-weight: var(--font-weight-medium);
+		transition: color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			width: 22px;
-			height: 22px;
+			width: var(--size-icon-md);
+			height: var(--size-icon-md);
 		}
 	}
 
 	.nav-item.active {
-		color: #111827;
+		color: var(--color-text);
 	}
 
 	.nav-item:not(.active):active {
-		color: #6b7280;
+		color: var(--color-text-muted);
 	}
 </style>

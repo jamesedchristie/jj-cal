@@ -31,11 +31,19 @@
 	textarea {
 		display: block;
 		font: inherit;
-		border: 1px solid lightgray;
-		border-radius: 4px;
+		font-size: var(--font-size-sm);
+		color: var(--color-text);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
 		box-shadow: none;
-		font-size: 14px;
-		padding: 5px;
+		padding: var(--space-1) var(--space-2);
 		resize: none;
+		outline: none;
+		transition: border-color var(--duration-fast) var(--ease-standard);
+
+		&:focus {
+			border-color: var(--color-focus-ring);
+		}
 	}
 </style>

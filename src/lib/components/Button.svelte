@@ -18,21 +18,25 @@
 	a,
 	button {
 		display: block;
-		min-height: var(--button-height, 30px);
-		background-color: var(--button-bg-color, black);
-		border: var(--button-border-width, 2px) solid;
-		border-color: var(--button-border-color, black);
-		border-radius: var(--button-border-radius, 4px);
-		color: var(--button-text-color, white);
+		min-height: var(--space-8);
+		background-color: var(--color-primary);
+		border: 1px solid var(--color-primary);
+		border-radius: var(--radius-sm);
+		color: var(--color-primary-text);
 		text-decoration: none;
 		cursor: pointer;
-		padding: var(--button-padding, 0.3rem 0.7rem);
-		transition:
-			background-color 0.2s ease,
-			color 0.2s ease;
+		padding: var(--space-1) var(--space-3);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		transition: background-color var(--duration-base) var(--ease-standard),
+			color var(--duration-base) var(--ease-standard);
+
 		&:hover {
-			background-color: var(--button-hover-bg-color, #333);
+			background-color: var(--color-primary-hover);
+			border-color: var(--color-primary-hover);
 		}
+
 		&:disabled {
 			opacity: 0.5;
 			cursor: default;
