@@ -127,15 +127,14 @@
 			datetime: date.getTime(),
 			text,
 			created_by_name: user?.name ?? '',
-			created_by_id: user?.id ?? 1
+			created_by_id: user?.id ?? ''
 		};
 		await addEventToDate({
 			calendarSlug,
 			year: date.getFullYear(),
 			month: date.getMonth() + 1,
 			date: date.getDate(),
-			text,
-			name: user.name
+			text
 		}).updates(
 			loadEvents({ calendarSlug, year, month }).withOverride((events) => [...events, newEvent])
 		);

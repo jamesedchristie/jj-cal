@@ -7,7 +7,7 @@ export class CalendarEvent {
 	calendar_slug: string;
 	calendar_id: number;
 	created_by_name: string;
-	created_by_id: number;
+	created_by_id: string;
 	constructor(e: typeof eventsTable.$inferSelect) {
 		this.id = $state(e.id);
 		this.datetime = $state(e.datetime);

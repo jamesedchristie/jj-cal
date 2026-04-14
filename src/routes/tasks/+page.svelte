@@ -58,13 +58,13 @@
 
 	<ul class="todo-list">
 		{#each incomplete as todo (todo.id)}
-			{@const toggle = toggleTodo.for(todo.id)}
-			{@const remove = removeTodo.for(todo.id)}
+			{@const toggle = toggleTodo.for(String(todo.id))}
+			{@const remove = removeTodo.for(String(todo.id))}
 			{@const status = todo.due_date ? dueDateStatus(todo.due_date) : null}
 			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
 				<form {...toggle}>
-					<input type="hidden" {...toggle.fields.id.as('hidden', String(todo.id))} />
-					<input type="hidden" {...toggle.fields.completed.as('hidden', 'true')} />
+					<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+					<input {...toggle.fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<circle cx="12" cy="12" r="10"/>
@@ -76,7 +76,7 @@
 					<span class="due-chip {status}">{formatDueDate(todo.due_date)}</span>
 				{/if}
 				<form {...remove}>
-					<input type="hidden" {...remove.fields.id.as('hidden', String(todo.id))} />
+					<input {...remove.fields.id.as('hidden', String(todo.id))} />
 					<button type="submit" class="delete" aria-label="Delete task">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<line x1="18" y1="6" x2="6" y2="18"/>
@@ -97,8 +97,8 @@
 					{@const remove = removeTodo.for(`done-${todo.id}`)}
 					<li>
 						<form {...toggle}>
-							<input type="hidden" {...toggle.fields.id.as('hidden', String(todo.id))} />
-							<input type="hidden" {...toggle.fields.completed.as('hidden', 'false')} />
+							<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+							<input {...toggle.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10"/>
@@ -108,7 +108,7 @@
 						</form>
 						<span class="text">{todo.text}</span>
 						<form {...remove}>
-							<input type="hidden" {...remove.fields.id.as('hidden', String(todo.id))} />
+							<input {...remove.fields.id.as('hidden', String(todo.id))} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18"/>

@@ -24,16 +24,26 @@ export const loadEvents = query('unchecked', async ({ calendarSlug, year, month 
 
 export const addEventToDate = command(
 	'unchecked',
-	async ({ calendarSlug, year, month, date, text, name }) => {
+	async ({ calendarSlug, year, month, date, text }) => {
 		const { locals } = getRequestEvent();
+		if (!locals.user) return { success: false };
 		try {
+			const calendar = await getCalendarBySlug(locals.db, calendarSlug);
+			if (!calendar) return { success: false };
 			const datetime = Temporal.ZonedDateTime.from({
 				year,
 				month,
 				day: date,
 				timeZone: 'Australia/Sydney'
 			}).epochMilliseconds;
-			await createEvent(locals.db, { calendarSlug, datetime, text, name });
+			await createEvent(locals.db, {
+				calendarSlug,
+				calendarId: calendar.id,
+				datetime,
+				text,
+				created_by_name: locals.user.name,
+				created_by_id: locals.user.id
+			});
 			for (const arg of requested(loadEvents, 1)) {
 				void loadEvents(arg).refresh();
 			}

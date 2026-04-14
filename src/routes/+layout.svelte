@@ -9,7 +9,6 @@
 	import type { Snippet } from 'svelte';
 	import '../app.css';
 	import type { LayoutData } from './$types';
-	import { logout } from './login.remote';
 	import { setToastService, ToastService } from '$lib/components/toast/toastService.svelte';
 	import Toast from '$lib/components/toast/Toast.svelte';
 
@@ -48,7 +47,7 @@
 		<div class="header-right">
 			<span>Logged in as: {data.user?.name ?? 'Not logged in'}</span>
 			{#if data.user}
-				<form {...logout}>
+				<form method="post" action="/api/auth/sign-out">
 					<Button type="submit">Logout</Button>
 				</form>
 			{/if}
