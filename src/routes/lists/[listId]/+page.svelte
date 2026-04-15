@@ -10,6 +10,8 @@
 
 	// Shopping lists don't need due dates
 	const showDueDate = $derived(list.type !== 'shopping');
+	// Viewers can see items but cannot add/edit/delete
+	const canEdit = $derived(list.role === 'owner' || list.role === 'editor');
 
 	// Today's date in Sydney time as YYYY-MM-DD
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
@@ -44,6 +46,7 @@
 		<h1>{list.name}</h1>
 	</div>
 
+	{#if canEdit}
 	<form
 		{...addItem.enhance(async ({ form, submit }) => {
 			await submit();
@@ -107,6 +110,7 @@
 			<input {...addItem.fields.due_date.as('hidden', '')} />
 		{/if}
 	</form>
+	{/if}
 
 	<ul class="item-list">
 		{#each incomplete as item (item.id)}
@@ -117,6 +121,7 @@
 			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
 				<form {...toggle}>
 					<input {...toggle.fields.id.as('hidden', item.id)} />
+					<input {...toggle.fields.list_id.as('hidden', list.id)} />
 					<input {...toggle.fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -133,8 +138,10 @@
 						<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 					</span>
 				{/if}
+				{#if canEdit}
 				<form {...remove}>
 					<input {...remove.fields.id.as('hidden', item.id)} />
+					<input {...remove.fields.list_id.as('hidden', list.id)} />
 					<button type="submit" class="delete" aria-label="Delete item">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<line x1="18" y1="6" x2="6" y2="18"/>
@@ -142,6 +149,7 @@
 						</svg>
 					</button>
 				</form>
+				{/if}
 			</li>
 		{/each}
 	</ul>
@@ -157,6 +165,7 @@
 					<li>
 						<form {...toggle}>
 							<input {...toggle.fields.id.as('hidden', item.id)} />
+							<input {...toggle.fields.list_id.as('hidden', list.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -171,8 +180,10 @@
 								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 							</span>
 						{/if}
+						{#if canEdit}
 						<form {...remove}>
 							<input {...remove.fields.id.as('hidden', item.id)} />
+							<input {...remove.fields.list_id.as('hidden', list.id)} />
 							<button type="submit" class="delete" aria-label="Delete item">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18"/>
@@ -180,6 +191,7 @@
 								</svg>
 							</button>
 						</form>
+						{/if}
 					</li>
 				{/each}
 			</ul>

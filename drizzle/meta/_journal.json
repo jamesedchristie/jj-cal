@@ -78,6 +78,13 @@
       "when": 1776402400000,
       "tag": "0010_lists_and_items",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1776488800000,
+      "tag": "0011_resource_shares",
+      "breakpoints": true
     }
   ]
 }

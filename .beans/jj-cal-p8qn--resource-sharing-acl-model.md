@@ -1,7 +1,7 @@
 ---
 # jj-cal-p8qn
 title: Resource sharing & ACL model
-status: todo
+status: done
 type: feature
 created_at: 2026-04-12T12:00:00Z
 updated_at: 2026-04-12T12:00:00Z

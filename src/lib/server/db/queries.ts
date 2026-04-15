@@ -1,6 +1,17 @@
 import { and, asc, count, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, invitesTable, listItemsTable, listsTable, type ListType, usersTable } from './schema';
+import {
+	calendarsTable,
+	eventsTable,
+	invitesTable,
+	listItemsTable,
+	listsTable,
+	type ListType,
+	type Permission,
+	type ResourceType,
+	resourceSharesTable,
+	usersTable
+} from './schema';
 
 // ---------------------------------------------------------------------------
 // User management is now handled by better-auth. These helpers have been
@@ -111,14 +122,7 @@ export async function deleteEvent(db: DrizzleClient, id: number) {
 }
 
 // jj-cal-o6bu / jj-cal-m3vk: lists + list items
-
-export async function getListsForUser(db: DrizzleClient, userId: string) {
-	return db
-		.select()
-		.from(listsTable)
-		.where(eq(listsTable.createdById, userId))
-		.orderBy(asc(listsTable.createdAt));
-}
+// jj-cal-p8qn: ACL enforcement
 
 export async function createList(
 	db: DrizzleClient,
@@ -159,37 +163,168 @@ export async function getOrCreatePrimaryList(db: DrizzleClient, userId: string) 
 	return rows[0];
 }
 
-export async function getListById(db: DrizzleClient, listId: string, userId: string) {
+/**
+ * Returns 'owner' | 'editor' | 'viewer' for the given user+list, or null if
+ * the user has no access at all. Owner access is implicit (createdById match);
+ * editor/viewer come from resource_shares.
+ */
+export async function getListAccess(
+	db: DrizzleClient,
+	listId: string,
+	userId: string
+): Promise<'owner' | 'editor' | 'viewer' | null> {
+	const list = await db
+		.select({ createdById: listsTable.createdById })
+		.from(listsTable)
+		.where(eq(listsTable.id, listId))
+		.limit(1);
+
+	if (!list[0]) return null;
+	if (list[0].createdById === userId) return 'owner';
+
+	const share = await db
+		.select({ permission: resourceSharesTable.permission })
+		.from(resourceSharesTable)
+		.where(
+			and(
+				eq(resourceSharesTable.resourceType, 'list'),
+				eq(resourceSharesTable.resourceId, listId),
+				eq(resourceSharesTable.userId, userId)
+			)
+		)
+		.limit(1);
+
+	if (!share[0]) return null;
+	return share[0].permission as 'editor' | 'viewer';
+}
+
+/**
+ * Fetch a list and attach the requesting user's access role. Returns null if
+ * the list doesn't exist or the user has no access.
+ */
+export async function getListWithAccess(db: DrizzleClient, listId: string, userId: string) {
+	const role = await getListAccess(db, listId, userId);
+	if (!role) return null;
+
 	const rows = await db
 		.select()
 		.from(listsTable)
-		.where(and(eq(listsTable.id, listId), eq(listsTable.createdById, userId)))
+		.where(eq(listsTable.id, listId))
 		.limit(1);
-	return rows[0] ?? null;
+
+	return rows[0] ? { ...rows[0], role } : null;
 }
 
+/**
+ * All lists the user can see: owned lists + lists shared with them. Each entry
+ * includes an `incompleteCount` and a `role` field.
+ */
 export async function getListsWithCounts(db: DrizzleClient, userId: string) {
-	const lists = await db
+	// Owned lists
+	const owned = await db
 		.select()
 		.from(listsTable)
 		.where(eq(listsTable.createdById, userId))
 		.orderBy(asc(listsTable.createdAt));
 
-	if (lists.length === 0) return [];
+	// Shares granted to this user for lists they don't own
+	const shares = await db
+		.select({ resourceId: resourceSharesTable.resourceId, permission: resourceSharesTable.permission })
+		.from(resourceSharesTable)
+		.where(
+			and(
+				eq(resourceSharesTable.resourceType, 'list'),
+				eq(resourceSharesTable.userId, userId)
+			)
+		);
+
+	const sharedIds = shares.map((s) => s.resourceId);
+	const sharedLists =
+		sharedIds.length > 0
+			? await db.select().from(listsTable).where(inArray(listsTable.id, sharedIds))
+			: [];
+
+	const sharePermMap = new Map(shares.map((s) => [s.resourceId, s.permission as Permission]));
+
+	const all = [
+		...owned.map((l) => ({ ...l, role: 'owner' as const })),
+		...sharedLists.map((l) => ({ ...l, role: sharePermMap.get(l.id)! }))
+	];
+
+	if (all.length === 0) return [];
 
 	const counts = await db
 		.select({ listId: listItemsTable.listId, n: count() })
 		.from(listItemsTable)
 		.where(
 			and(
-				inArray(listItemsTable.listId, lists.map((l) => l.id)),
+				inArray(listItemsTable.listId, all.map((l) => l.id)),
 				eq(listItemsTable.completed, false)
 			)
 		)
 		.groupBy(listItemsTable.listId);
 
 	const countMap = new Map(counts.map((c) => [c.listId, c.n]));
-	return lists.map((l) => ({ ...l, incompleteCount: countMap.get(l.id) ?? 0 }));
+	return all.map((l) => ({ ...l, incompleteCount: countMap.get(l.id) ?? 0 }));
+}
+
+// jj-cal-p8qn: ACL management (used by future sharing UI)
+
+export async function shareResource(
+	db: DrizzleClient,
+	input: {
+		resourceType: ResourceType;
+		resourceId: string;
+		userId: string;
+		permission: Permission;
+		createdById: string;
+	}
+) {
+	const existing = await db
+		.select({ id: resourceSharesTable.id })
+		.from(resourceSharesTable)
+		.where(
+			and(
+				eq(resourceSharesTable.resourceType, input.resourceType),
+				eq(resourceSharesTable.resourceId, input.resourceId),
+				eq(resourceSharesTable.userId, input.userId)
+			)
+		)
+		.limit(1);
+
+	if (existing[0]) {
+		await db
+			.update(resourceSharesTable)
+			.set({ permission: input.permission })
+			.where(eq(resourceSharesTable.id, existing[0].id));
+		return existing[0].id;
+	}
+
+	const rows = await db
+		.insert(resourceSharesTable)
+		.values({ ...input, id: crypto.randomUUID(), createdAt: new Date() })
+		.returning({ id: resourceSharesTable.id });
+	return rows[0].id;
+}
+
+export async function removeResourceShare(db: DrizzleClient, shareId: string) {
+	await db.delete(resourceSharesTable).where(eq(resourceSharesTable.id, shareId));
+}
+
+export async function getResourceSharesForResource(
+	db: DrizzleClient,
+	resourceType: ResourceType,
+	resourceId: string
+) {
+	return db
+		.select()
+		.from(resourceSharesTable)
+		.where(
+			and(
+				eq(resourceSharesTable.resourceType, resourceType),
+				eq(resourceSharesTable.resourceId, resourceId)
+			)
+		);
 }
 
 export async function getListItems(db: DrizzleClient, listId: string) {

@@ -122,3 +122,28 @@ export const listItemsTable = sqliteTable('list_item', {
 	createdById: text('created_by_id').notNull(),
 	assignedToId: text('assigned_to_id')
 });
+
+// jj-cal-p8qn: resource sharing & ACL model
+
+export const RESOURCE_TYPES = ['list', 'calendar'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
+export const PERMISSION_LEVELS = ['viewer', 'editor'] as const;
+export type Permission = (typeof PERMISSION_LEVELS)[number];
+
+// Owner access is implicit (createdById on the resource). Shares only needed
+// for non-owners. Unique on (resource_type, resource_id, user_id) enforced
+// by the DB index — one permission level per (resource, user) pair.
+export const resourceSharesTable = sqliteTable('resource_share', {
+	id: text('id').primaryKey(),
+	resourceType: text('resource_type', { enum: RESOURCE_TYPES }).notNull(),
+	resourceId: text('resource_id').notNull(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => usersTable.id, { onDelete: 'cascade' }),
+	permission: text('permission', { enum: PERMISSION_LEVELS }).notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	createdById: text('created_by_id')
+		.notNull()
+		.references(() => usersTable.id)
+});

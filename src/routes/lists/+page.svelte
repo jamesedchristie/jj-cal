@@ -90,6 +90,9 @@
 					<a href={resolve(`/lists/${list.id}`)} class="card">
 						<span class="card-icon">{@html cfg.icon}</span>
 						<span class="card-name">{list.name}</span>
+						{#if list.role !== 'owner'}
+							<span class="card-shared">Shared</span>
+						{/if}
 						<span class="card-type">{cfg.label}</span>
 						{#if list.incompleteCount > 0}
 							<span class="card-count">{list.incompleteCount}</span>
@@ -294,6 +297,16 @@
 		flex: 1;
 		font-size: var(--font-size-base);
 		font-family: var(--font-body);
+	}
+
+	.card-shared {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-accent);
+		background: var(--color-info-bg);
+		padding: 0 var(--space-2);
+		border-radius: var(--radius-full);
 	}
 
 	.card-type {
