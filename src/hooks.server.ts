@@ -7,18 +7,34 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	event.locals.db = getDb(event.platform?.env?.DB, env.DATABASE_URL);
+	try {
+		event.locals.db = getDb(event.platform?.env?.DB, env.DATABASE_URL);
+	} catch (e) {
+		console.error('[hook] getDb failed:', e);
+		throw e;
+	}
 	const auth = createAuth(event.locals.db);
 
 	// On first boot (no users in DB), create the seed admin from env vars.
 	// The check is cheap (COUNT query) and short-circuits once users exist.
-	await maybeSeedAdmin(event.locals.db, auth, {
-		SEED_ADMIN_USERNAME: env.SEED_ADMIN_USERNAME,
-		SEED_ADMIN_PASSWORD: env.SEED_ADMIN_PASSWORD
-	});
+	try {
+		await maybeSeedAdmin(event.locals.db, auth, {
+			SEED_ADMIN_USERNAME: env.SEED_ADMIN_USERNAME,
+			SEED_ADMIN_PASSWORD: env.SEED_ADMIN_PASSWORD
+		});
+	} catch (e) {
+		console.error('[hook] maybeSeedAdmin failed:', e);
+		throw e;
+	}
 
 	// Load the current session (DB-backed, no in-memory state).
-	const session = await auth.api.getSession({ headers: event.request.headers });
+	let session;
+	try {
+		session = await auth.api.getSession({ headers: event.request.headers });
+	} catch (e) {
+		console.error('[hook] getSession failed:', e);
+		throw e;
+	}
 
 	// Treat soft-deleted users as unauthenticated.
 	const user = session?.user && !session.user.deletedAt ? session.user : null;
