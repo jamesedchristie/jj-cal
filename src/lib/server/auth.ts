@@ -15,6 +15,8 @@ import { accountsTable, sessionsTable, usersTable, verificationsTable } from './
 
 export function createAuth(db: DrizzleClient) {
 	return betterAuth({
+		secret: process.env.AUTH_SECRET,
+
 		database: drizzleAdapter(db, {
 			provider: 'sqlite',
 			// Map better-auth model names → our Drizzle table objects.
@@ -83,7 +85,10 @@ export function createAuth(db: DrizzleClient) {
 
 		baseURL: {
 			allowedHosts: ['localhost:5173', 'localhost:5174', 'jj-cal.james-ed-christie1.workers.dev'],
-			protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http'
+			protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
+			fallback: process.env.NODE_ENV === 'production'
+				? 'https://jj-cal.james-ed-christie1.workers.dev'
+				: 'http://localhost:5173'
 		}
 	});
 }
