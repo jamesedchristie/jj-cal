@@ -1,9 +1,10 @@
 <script lang="ts">
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
-	import { addTodo, getTodos, getUsers, removeTodo, toggleTodo } from './data.remote';
+	import { addItem, getItems, getPrimaryList, getUsers, removeItem, toggleItem } from './data.remote';
 
-	const incomplete = $derived((await getTodos()).filter((t) => !t.completed));
-	const complete = $derived((await getTodos()).filter((t) => t.completed));
+	const list = $derived(await getPrimaryList());
+	const incomplete = $derived((await getItems()).filter((t) => !t.completed));
+	const complete = $derived((await getItems()).filter((t) => t.completed));
 	const users = $derived(await getUsers());
 
 	// Today's date in Sydney time as YYYY-MM-DD
@@ -30,19 +31,21 @@
 </script>
 
 <div class="page">
-	<h1>Tasks</h1>
+	<h1>{list.name}</h1>
 
 	<form
-		{...addTodo.enhance(async ({ form, submit }) => {
+		{...addItem.enhance(async ({ form, submit }) => {
 			await submit();
 			form.reset();
 			selectedAssigneeId = null;
 		})}
 		class="add-form"
 	>
+		<input {...addItem.fields.list_id.as('hidden', list.id)} />
+
 		<div class="add-row">
 			<input
-				{...addTodo.fields.text.as('text')}
+				{...addItem.fields.text.as('text')}
 				placeholder="Add a task…"
 				autocomplete="off"
 			/>
@@ -56,7 +59,7 @@
 
 		{#if users.length > 0}
 			<div class="add-meta add-assignee">
-				<input {...addTodo.fields.assignee_id.as('hidden', selectedAssigneeId ?? '')} />
+				<input {...addItem.fields.assigned_to_id.as('hidden', selectedAssigneeId ?? '')} />
 				<span class="meta-label">Assign to</span>
 				<div class="assignee-row">
 					{#each users as u (u.id)}
@@ -89,20 +92,20 @@
 					<line x1="8" y1="2" x2="8" y2="6"/>
 					<line x1="3" y1="10" x2="21" y2="10"/>
 				</svg>
-				<input {...addTodo.fields.due_date.as('date')} />
+				<input {...addItem.fields.due_date.as('date')} />
 			</label>
 		</div>
 	</form>
 
 	<ul class="todo-list">
-		{#each incomplete as todo (todo.id)}
-			{@const toggle = toggleTodo.for(String(todo.id))}
-			{@const remove = removeTodo.for(String(todo.id))}
-			{@const status = todo.due_date ? dueDateStatus(todo.due_date) : null}
-			{@const assignee = userById(todo.assignee_id ?? null)}
+		{#each incomplete as item (item.id)}
+			{@const toggle = toggleItem.for(item.id)}
+			{@const remove = removeItem.for(item.id)}
+			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
+			{@const assignee = userById(item.assignedToId ?? null)}
 			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
 				<form {...toggle}>
-					<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+					<input {...toggle.fields.id.as('hidden', item.id)} />
 					<input {...toggle.fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -110,9 +113,9 @@
 						</svg>
 					</button>
 				</form>
-				<span class="text">{todo.text}</span>
-				{#if todo.due_date}
-					<span class="due-chip {status}">{formatDueDate(todo.due_date)}</span>
+				<span class="text">{item.text}</span>
+				{#if item.dueDate}
+					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
 				{/if}
 				{#if assignee}
 					<span class="assignee-chip">
@@ -125,7 +128,7 @@
 					</span>
 				{/if}
 				<form {...remove}>
-					<input {...remove.fields.id.as('hidden', String(todo.id))} />
+					<input {...remove.fields.id.as('hidden', item.id)} />
 					<button type="submit" class="delete" aria-label="Delete task">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<line x1="18" y1="6" x2="6" y2="18"/>
@@ -141,13 +144,13 @@
 		<details class="completed-section">
 			<summary>{complete.length} completed</summary>
 			<ul class="todo-list completed">
-				{#each complete as todo (todo.id)}
-					{@const toggle = toggleTodo.for(`uncomplete-${todo.id}`)}
-					{@const remove = removeTodo.for(`done-${todo.id}`)}
-					{@const assignee = userById(todo.assignee_id ?? null)}
+				{#each complete as item (item.id)}
+					{@const toggle = toggleItem.for(`uncomplete-${item.id}`)}
+					{@const remove = removeItem.for(`done-${item.id}`)}
+					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
 						<form {...toggle}>
-							<input {...toggle.fields.id.as('hidden', String(todo.id))} />
+							<input {...toggle.fields.id.as('hidden', item.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -156,7 +159,7 @@
 								</svg>
 							</button>
 						</form>
-						<span class="text">{todo.text}</span>
+						<span class="text">{item.text}</span>
 						{#if assignee}
 							<span class="assignee-chip">
 								<UserAvatar
@@ -168,7 +171,7 @@
 							</span>
 						{/if}
 						<form {...remove}>
-							<input {...remove.fields.id.as('hidden', String(todo.id))} />
+							<input {...remove.fields.id.as('hidden', item.id)} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18"/>

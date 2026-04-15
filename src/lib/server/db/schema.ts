@@ -95,16 +95,30 @@ export const eventsTable = sqliteTable('event', {
 	created_by_id: text('created_by_id').notNull()
 });
 
-export const todosTable = sqliteTable('todo', {
-	id: integer('id').primaryKey(),
+// jj-cal-o6bu / jj-cal-m3vk: generic lists model
+
+export const LIST_TYPES = ['todo', 'shopping', 'packing', 'custom'] as const;
+export type ListType = (typeof LIST_TYPES)[number];
+
+export const listsTable = sqliteTable('list', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	type: text('type', { enum: LIST_TYPES }).notNull().default('todo'),
+	createdById: text('created_by_id').notNull().references(() => usersTable.id),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+});
+
+export const listItemsTable = sqliteTable('list_item', {
+	id: text('id').primaryKey(),
+	listId: text('list_id')
+		.notNull()
+		.references(() => listsTable.id, { onDelete: 'cascade' }),
 	text: text('text').notNull(),
 	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
-	completed_at: integer('completed_at'),
-	due_date: text('due_date'),
-	sort_order: integer('sort_order').notNull().default(0),
-	created_at: integer('created_at').notNull(),
-	created_by_name: text('created_by_name').notNull(),
-	created_by_id: text('created_by_id').notNull(),
-	// jj-cal-85er: optional assignee (references usersTable.id)
-	assignee_id: text('assignee_id')
+	completedAt: integer('completed_at', { mode: 'timestamp' }),
+	dueDate: text('due_date'),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	createdById: text('created_by_id').notNull(),
+	assignedToId: text('assigned_to_id')
 });

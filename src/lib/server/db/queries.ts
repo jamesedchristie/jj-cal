@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
-import { calendarsTable, eventsTable, invitesTable, todosTable, usersTable } from './schema';
+import { calendarsTable, eventsTable, invitesTable, listItemsTable, listsTable, type ListType, usersTable } from './schema';
 
 // ---------------------------------------------------------------------------
 // User management is now handled by better-auth. These helpers have been
@@ -110,39 +110,92 @@ export async function deleteEvent(db: DrizzleClient, id: number) {
 	return true;
 }
 
-export async function getAllTodos(db: DrizzleClient) {
-	return db.select().from(todosTable).orderBy(asc(todosTable.sort_order), asc(todosTable.created_at));
+// jj-cal-o6bu / jj-cal-m3vk: lists + list items
+
+export async function getListsForUser(db: DrizzleClient, userId: string) {
+	return db
+		.select()
+		.from(listsTable)
+		.where(eq(listsTable.createdById, userId))
+		.orderBy(asc(listsTable.createdAt));
 }
 
-export async function createTodo(
+export async function createList(
+	db: DrizzleClient,
+	input: { id: string; name: string; type: ListType; createdById: string }
+) {
+	const rows = await db
+		.insert(listsTable)
+		.values({ ...input, createdAt: new Date() })
+		.returning();
+	return rows[0];
+}
+
+/**
+ * Return the first todo-type list for the user, creating a "My tasks" list if
+ * none exists yet (new users who never had any todos won't have one after the
+ * migration).
+ */
+export async function getOrCreatePrimaryList(db: DrizzleClient, userId: string) {
+	const existing = await db
+		.select()
+		.from(listsTable)
+		.where(and(eq(listsTable.createdById, userId), eq(listsTable.type, 'todo')))
+		.orderBy(asc(listsTable.createdAt))
+		.limit(1);
+
+	if (existing[0]) return existing[0];
+
+	const rows = await db
+		.insert(listsTable)
+		.values({
+			id: crypto.randomUUID(),
+			name: 'My tasks',
+			type: 'todo',
+			createdById: userId,
+			createdAt: new Date()
+		})
+		.returning();
+	return rows[0];
+}
+
+export async function getListItems(db: DrizzleClient, listId: string) {
+	return db
+		.select()
+		.from(listItemsTable)
+		.where(eq(listItemsTable.listId, listId))
+		.orderBy(asc(listItemsTable.sortOrder), asc(listItemsTable.createdAt));
+}
+
+export async function createListItem(
 	db: DrizzleClient,
 	input: {
+		listId: string;
 		text: string;
-		created_by_id: string;
-		created_by_name: string;
-		sort_order: number;
-		due_date?: string | null;
-		assignee_id?: string | null;
+		createdById: string;
+		sortOrder: number;
+		dueDate?: string | null;
+		assignedToId?: string | null;
 	}
 ) {
-	const todo = await db
-		.insert(todosTable)
-		.values({ ...input, created_at: Date.now() })
+	const rows = await db
+		.insert(listItemsTable)
+		.values({ ...input, id: crypto.randomUUID(), createdAt: new Date() })
 		.returning();
-	return todo[0];
+	return rows[0];
 }
 
-export async function setTodoCompleted(db: DrizzleClient, id: number, completed: boolean) {
-	const todo = await db
-		.update(todosTable)
-		.set({ completed, completed_at: completed ? Date.now() : null })
-		.where(eq(todosTable.id, id))
+export async function setListItemCompleted(db: DrizzleClient, id: string, completed: boolean) {
+	const rows = await db
+		.update(listItemsTable)
+		.set({ completed, completedAt: completed ? new Date() : null })
+		.where(eq(listItemsTable.id, id))
 		.returning();
-	return todo[0];
+	return rows[0];
 }
 
-export async function deleteTodo(db: DrizzleClient, id: number) {
-	await db.delete(todosTable).where(eq(todosTable.id, id));
+export async function deleteListItem(db: DrizzleClient, id: string) {
+	await db.delete(listItemsTable).where(eq(listItemsTable.id, id));
 }
 
 export async function getEventsForMonth(
