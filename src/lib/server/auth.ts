@@ -79,6 +79,11 @@ export function createAuth(db: DrizzleClient) {
 			updateAge: 60 * 60 * 24,
 			// No in-memory cookie cache — Workers have no persistent process state.
 			cookieCache: { enabled: false }
+		},
+
+		baseURL: {
+			allowedHosts: ['localhost:5173', 'localhost:5174', 'jj-cal.james-ed-christie1.workers.dev'],
+			protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http'
 		}
 	});
 }

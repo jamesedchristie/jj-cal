@@ -19,11 +19,15 @@ export async function maybeSeedAdmin(
 	env: { SEED_ADMIN_USERNAME?: string; SEED_ADMIN_PASSWORD?: string }
 ) {
 	const { SEED_ADMIN_USERNAME: username, SEED_ADMIN_PASSWORD: password } = env;
-	if (!username || !password) return;
+	if (!username || !password) {
+		return;
+	}
 
 	// Fast path — skip if users already exist.
 	const existing = await db.select().from(usersTable).limit(1);
-	if (existing.length > 0) return;
+	if (existing.length > 0) {
+		return;
+	}
 
 	// Create the user via better-auth so the password is hashed correctly.
 	// We use a synthetic email address; the app never sends email.
@@ -42,10 +46,7 @@ export async function maybeSeedAdmin(
 	}
 
 	// Promote to admin — better-auth doesn't expose isAdmin through signUpEmail.
-	await db
-		.update(usersTable)
-		.set({ isAdmin: true })
-		.where(eq(usersTable.id, result.user.id));
+	await db.update(usersTable).set({ isAdmin: true }).where(eq(usersTable.id, result.user.id));
 
 	console.log(`[seed] Admin user "${username}" created.`);
 }
