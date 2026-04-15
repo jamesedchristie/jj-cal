@@ -1,7 +1,7 @@
 ---
 # jj-cal-9ol1
 title: Recurring todos
-status: todo
+status: done
 type: feature
 created_at: 2026-04-12T06:20:09Z
 updated_at: 2026-04-12T06:20:09Z

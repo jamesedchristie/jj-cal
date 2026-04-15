@@ -71,6 +71,27 @@
       "when": 1776316000000,
       "tag": "0009_todo_assignee",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1776402400000,
+      "tag": "0010_lists_and_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1776488800000,
+      "tag": "0011_resource_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1776575200000,
+      "tag": "0012_recurring_items",
+      "breakpoints": true
     }
   ]
 }

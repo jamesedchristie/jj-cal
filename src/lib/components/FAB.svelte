@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
 	import { fly, fade } from 'svelte/transition';
-	import { addTodo } from '../../routes/tasks/data.remote';
+	import { addItemToPrimaryList } from '../../routes/tasks/data.remote';
 
 	const section = $derived(
 		page.url.pathname.startsWith('/tasks') ? 'tasks' : null
@@ -51,7 +51,7 @@
 		{#if section === 'tasks'}
 			<p class="sheet-label">New task</p>
 			<form
-				{...addTodo.enhance(async ({ form, submit }) => {
+				{...addItemToPrimaryList.enhance(async ({ form, submit }) => {
 					await submit();
 					form.reset();
 					closeSheet();
@@ -60,7 +60,7 @@
 			>
 				<input
 					bind:this={inputEl}
-					{...addTodo.fields.text.as('text')}
+					{...addItemToPrimaryList.fields.text.as('text')}
 					placeholder="What needs to be done?"
 					autocomplete="off"
 					class="sheet-input"

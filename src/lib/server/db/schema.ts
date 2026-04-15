@@ -95,16 +95,61 @@ export const eventsTable = sqliteTable('event', {
 	created_by_id: text('created_by_id').notNull()
 });
 
-export const todosTable = sqliteTable('todo', {
-	id: integer('id').primaryKey(),
+// jj-cal-o6bu / jj-cal-m3vk: generic lists model
+
+export const LIST_TYPES = ['todo', 'shopping', 'packing', 'custom'] as const;
+export type ListType = (typeof LIST_TYPES)[number];
+
+export const listsTable = sqliteTable('list', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	type: text('type', { enum: LIST_TYPES }).notNull().default('todo'),
+	createdById: text('created_by_id').notNull().references(() => usersTable.id),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+});
+
+export const RECURRENCE_INTERVALS = ['daily', 'weekly', 'fortnightly', 'monthly'] as const;
+export type RecurrenceInterval = (typeof RECURRENCE_INTERVALS)[number];
+
+export const listItemsTable = sqliteTable('list_item', {
+	id: text('id').primaryKey(),
+	listId: text('list_id')
+		.notNull()
+		.references(() => listsTable.id, { onDelete: 'cascade' }),
 	text: text('text').notNull(),
 	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
-	completed_at: integer('completed_at'),
-	due_date: text('due_date'),
-	sort_order: integer('sort_order').notNull().default(0),
-	created_at: integer('created_at').notNull(),
-	created_by_name: text('created_by_name').notNull(),
-	created_by_id: text('created_by_id').notNull(),
-	// jj-cal-85er: optional assignee (references usersTable.id)
-	assignee_id: text('assignee_id')
+	completedAt: integer('completed_at', { mode: 'timestamp' }),
+	dueDate: text('due_date'),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	createdById: text('created_by_id').notNull(),
+	assignedToId: text('assigned_to_id'),
+	// jj-cal-9ol1: virtual recurrence — item re-appears once completedAt is
+	// older than the interval. No new rows created; one row per recurring task.
+	recurrenceInterval: text('recurrence_interval', { enum: RECURRENCE_INTERVALS })
+});
+
+// jj-cal-p8qn: resource sharing & ACL model
+
+export const RESOURCE_TYPES = ['list', 'calendar'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
+export const PERMISSION_LEVELS = ['viewer', 'editor'] as const;
+export type Permission = (typeof PERMISSION_LEVELS)[number];
+
+// Owner access is implicit (createdById on the resource). Shares only needed
+// for non-owners. Unique on (resource_type, resource_id, user_id) enforced
+// by the DB index — one permission level per (resource, user) pair.
+export const resourceSharesTable = sqliteTable('resource_share', {
+	id: text('id').primaryKey(),
+	resourceType: text('resource_type', { enum: RESOURCE_TYPES }).notNull(),
+	resourceId: text('resource_id').notNull(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => usersTable.id, { onDelete: 'cascade' }),
+	permission: text('permission', { enum: PERMISSION_LEVELS }).notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	createdById: text('created_by_id')
+		.notNull()
+		.references(() => usersTable.id)
 });
