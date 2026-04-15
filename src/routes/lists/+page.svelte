@@ -59,7 +59,7 @@
 				class="name-input"
 			/>
 			<div class="type-row">
-				{#each (Object.entries(typeConfig) as [type, cfg][])}
+			{#each Object.entries(typeConfig) as [type, cfg]}
 					<label class="type-option" class:selected={selectedType === type}>
 						<input
 							type="radio"
