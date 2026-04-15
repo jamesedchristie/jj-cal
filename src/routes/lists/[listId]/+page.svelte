@@ -44,6 +44,15 @@
 			</svg>
 		</a>
 		<h1>{list.name}</h1>
+		{#if list.role === 'owner'}
+			<a href={resolve(`/lists/${list.id}/share`)} class="share-link" aria-label="Manage sharing">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+					<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+					<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+				</svg>
+			</a>
+		{/if}
 	</div>
 
 	{#if canEdit}
@@ -213,6 +222,28 @@
 		align-items: center;
 		gap: var(--space-2);
 		padding: var(--space-4) var(--space-4) var(--space-2);
+
+		h1 {
+			flex: 1;
+		}
+	}
+
+	.share-link {
+		flex: none;
+		display: flex;
+		align-items: center;
+		color: var(--color-text-muted);
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-standard);
+
+		svg {
+			width: var(--space-5);
+			height: var(--space-5);
+		}
+
+		&:hover {
+			color: var(--color-text);
+		}
 	}
 
 	.back-link {

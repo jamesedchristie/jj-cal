@@ -307,6 +307,17 @@ export async function shareResource(
 	return rows[0].id;
 }
 
+export async function updateResourceSharePermission(
+	db: DrizzleClient,
+	shareId: string,
+	permission: Permission
+) {
+	await db
+		.update(resourceSharesTable)
+		.set({ permission })
+		.where(eq(resourceSharesTable.id, shareId));
+}
+
 export async function removeResourceShare(db: DrizzleClient, shareId: string) {
 	await db.delete(resourceSharesTable).where(eq(resourceSharesTable.id, shareId));
 }
@@ -323,6 +334,30 @@ export async function getResourceSharesForResource(
 			and(
 				eq(resourceSharesTable.resourceType, resourceType),
 				eq(resourceSharesTable.resourceId, resourceId)
+			)
+		);
+}
+
+/**
+ * Returns shares for a list with user display info joined in.
+ * Used by the sharing UI to show avatars and names.
+ */
+export async function getListSharesWithUsers(db: DrizzleClient, listId: string) {
+	return db
+		.select({
+			shareId: resourceSharesTable.id,
+			permission: resourceSharesTable.permission,
+			userId: usersTable.id,
+			name: usersTable.name,
+			displayName: usersTable.displayName,
+			colour: usersTable.colour
+		})
+		.from(resourceSharesTable)
+		.innerJoin(usersTable, eq(resourceSharesTable.userId, usersTable.id))
+		.where(
+			and(
+				eq(resourceSharesTable.resourceType, 'list'),
+				eq(resourceSharesTable.resourceId, listId)
 			)
 		);
 }
