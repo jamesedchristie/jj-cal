@@ -1,51 +1,33 @@
+import { error } from '@sveltejs/kit';
 import { form, getRequestEvent, query } from '$app/server';
 import {
 	createListItem,
 	deleteListItem,
+	getListById,
 	getListItems,
-	getOrCreatePrimaryList,
 	getUsersBasic,
 	setListItemCompleted
 } from '$lib/server/db/queries';
 import * as v from 'valibot';
 
-export const getPrimaryList = query(async () => {
-	const { locals } = getRequestEvent();
+export const getList = query(async () => {
+	const { locals, params } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
-	return getOrCreatePrimaryList(locals.db, locals.user.id);
+	const list = await getListById(locals.db, params.listId, locals.user.id);
+	if (!list) error(404, 'List not found');
+	return list;
 });
 
 export const getItems = query(async () => {
-	const { locals } = getRequestEvent();
+	const { locals, params } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
-	const list = await getOrCreatePrimaryList(locals.db, locals.user.id);
-	return getListItems(locals.db, list.id);
+	return getListItems(locals.db, params.listId);
 });
 
 export const getUsers = query(async () => {
 	const { locals } = getRequestEvent();
 	return getUsersBasic(locals.db);
 });
-
-/**
- * FAB shortcut — adds an item to the user's primary todo list without
- * requiring the caller to know the list ID.
- */
-export const addItemToPrimaryList = form(
-	v.object({ text: v.pipe(v.string(), v.nonEmpty()) }),
-	async ({ text }) => {
-		const { locals } = getRequestEvent();
-		if (!locals.user) throw 'Not authenticated';
-		const list = await getOrCreatePrimaryList(locals.db, locals.user.id);
-		await createListItem(locals.db, {
-			listId: list.id,
-			text: text.trim(),
-			createdById: locals.user.id,
-			sortOrder: Date.now()
-		});
-		void getItems().refresh();
-	}
-);
 
 export const addItem = form(
 	v.object({

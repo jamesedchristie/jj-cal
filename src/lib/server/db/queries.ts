@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
 import { calendarsTable, eventsTable, invitesTable, listItemsTable, listsTable, type ListType, usersTable } from './schema';
 
@@ -157,6 +157,39 @@ export async function getOrCreatePrimaryList(db: DrizzleClient, userId: string) 
 		})
 		.returning();
 	return rows[0];
+}
+
+export async function getListById(db: DrizzleClient, listId: string, userId: string) {
+	const rows = await db
+		.select()
+		.from(listsTable)
+		.where(and(eq(listsTable.id, listId), eq(listsTable.createdById, userId)))
+		.limit(1);
+	return rows[0] ?? null;
+}
+
+export async function getListsWithCounts(db: DrizzleClient, userId: string) {
+	const lists = await db
+		.select()
+		.from(listsTable)
+		.where(eq(listsTable.createdById, userId))
+		.orderBy(asc(listsTable.createdAt));
+
+	if (lists.length === 0) return [];
+
+	const counts = await db
+		.select({ listId: listItemsTable.listId, n: count() })
+		.from(listItemsTable)
+		.where(
+			and(
+				inArray(listItemsTable.listId, lists.map((l) => l.id)),
+				eq(listItemsTable.completed, false)
+			)
+		)
+		.groupBy(listItemsTable.listId);
+
+	const countMap = new Map(counts.map((c) => [c.listId, c.n]));
+	return lists.map((l) => ({ ...l, incompleteCount: countMap.get(l.id) ?? 0 }));
 }
 
 export async function getListItems(db: DrizzleClient, listId: string) {
