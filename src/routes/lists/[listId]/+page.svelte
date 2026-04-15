@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
+	import { isEffectivelyComplete, INTERVAL_LABELS, RECURRENCE_INTERVALS } from '$lib/recurrence';
 	import { addItem, getItems, getList, getUsers, removeItem, toggleItem } from './data.remote';
 
 	const list = $derived(await getList());
-	const incomplete = $derived((await getItems()).filter((t) => !t.completed));
-	const complete = $derived((await getItems()).filter((t) => t.completed));
+	const allItems = $derived(await getItems());
+	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
+	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
 	const users = $derived(await getUsers());
 
 	// Shopping lists don't need due dates
@@ -17,6 +19,7 @@
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
 
 	let selectedAssigneeId = $state<string | null>(null);
+	let selectedRecurrence = $state('');
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -61,6 +64,7 @@
 			await submit();
 			form.reset();
 			selectedAssigneeId = null;
+			selectedRecurrence = '';
 		})}
 		class="add-form"
 	>
@@ -118,6 +122,23 @@
 			<!-- Keep hidden field so form validation passes -->
 			<input {...addItem.fields.due_date.as('hidden', '')} />
 		{/if}
+
+		<div class="add-meta add-recurrence">
+			<input {...addItem.fields.recurrence_interval.as('hidden', selectedRecurrence)} />
+			<span class="meta-label">Repeat</span>
+			<div class="recurrence-row">
+				{#each RECURRENCE_INTERVALS as interval (interval)}
+					<button
+						type="button"
+						class="recurrence-btn"
+						class:selected={selectedRecurrence === interval}
+						onclick={() => {
+							selectedRecurrence = selectedRecurrence === interval ? '' : interval;
+						}}
+					>{INTERVAL_LABELS[interval]}</button>
+				{/each}
+			</div>
+		</div>
 	</form>
 	{/if}
 
@@ -141,6 +162,9 @@
 				<span class="text">{item.text}</span>
 				{#if item.dueDate && showDueDate}
 					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
+				{/if}
+				{#if item.recurrenceInterval}
+					<span class="recurrence-chip">{INTERVAL_LABELS[item.recurrenceInterval]}</span>
 				{/if}
 				{#if assignee}
 					<span class="assignee-chip">
@@ -526,6 +550,53 @@
 	li:hover .delete,
 	li:focus-within .delete {
 		opacity: 1;
+	}
+
+	.add-recurrence {
+		padding: var(--space-2) var(--space-3);
+	}
+
+	.recurrence-row {
+		display: flex;
+		gap: var(--space-1);
+		flex-wrap: wrap;
+	}
+
+	.recurrence-btn {
+		background: var(--color-surface-sunken);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		padding: var(--space-1) var(--space-2);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard),
+			border-color var(--duration-fast) var(--ease-standard);
+
+		&:hover {
+			background: var(--color-surface-raised);
+			color: var(--color-text);
+		}
+
+		&.selected {
+			background: var(--color-primary);
+			border-color: var(--color-primary);
+			color: var(--color-primary-text);
+		}
+	}
+
+	.recurrence-chip {
+		flex: none;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
+		white-space: nowrap;
+		background: var(--color-surface-sunken);
+		color: var(--color-text-subtle);
 	}
 
 	.completed-section {

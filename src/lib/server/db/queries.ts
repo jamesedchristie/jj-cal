@@ -8,6 +8,7 @@ import {
 	listsTable,
 	type ListType,
 	type Permission,
+	type RecurrenceInterval,
 	type ResourceType,
 	resourceSharesTable,
 	usersTable
@@ -379,6 +380,7 @@ export async function createListItem(
 		sortOrder: number;
 		dueDate?: string | null;
 		assignedToId?: string | null;
+		recurrenceInterval?: RecurrenceInterval | null;
 	}
 ) {
 	const rows = await db

@@ -108,6 +108,9 @@ export const listsTable = sqliteTable('list', {
 	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 
+export const RECURRENCE_INTERVALS = ['daily', 'weekly', 'fortnightly', 'monthly'] as const;
+export type RecurrenceInterval = (typeof RECURRENCE_INTERVALS)[number];
+
 export const listItemsTable = sqliteTable('list_item', {
 	id: text('id').primaryKey(),
 	listId: text('list_id')
@@ -120,7 +123,10 @@ export const listItemsTable = sqliteTable('list_item', {
 	sortOrder: integer('sort_order').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 	createdById: text('created_by_id').notNull(),
-	assignedToId: text('assigned_to_id')
+	assignedToId: text('assigned_to_id'),
+	// jj-cal-9ol1: virtual recurrence — item re-appears once completedAt is
+	// older than the interval. No new rows created; one row per recurring task.
+	recurrenceInterval: text('recurrence_interval', { enum: RECURRENCE_INTERVALS })
 });
 
 // jj-cal-p8qn: resource sharing & ACL model

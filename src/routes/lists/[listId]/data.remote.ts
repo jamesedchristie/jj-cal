@@ -9,7 +9,13 @@ import {
 	getUsersBasic,
 	setListItemCompleted
 } from '$lib/server/db/queries';
+import type { RecurrenceInterval } from '$lib/server/db/schema';
 import * as v from 'valibot';
+
+const recurrenceField = v.pipe(
+	v.string(),
+	v.transform((s) => (s || null) as RecurrenceInterval | null)
+);
 
 export const getList = query(async () => {
 	const { locals, params } = getRequestEvent();
@@ -44,9 +50,10 @@ export const addItem = form(
 		list_id: v.pipe(v.string(), v.nonEmpty()),
 		text: v.pipe(v.string(), v.nonEmpty()),
 		due_date: v.pipe(v.string(), v.transform((s) => s || null)),
-		assigned_to_id: v.pipe(v.string(), v.transform((s) => s || null))
+		assigned_to_id: v.pipe(v.string(), v.transform((s) => s || null)),
+		recurrence_interval: recurrenceField
 	}),
-	async ({ list_id, text, due_date, assigned_to_id }) => {
+	async ({ list_id, text, due_date, assigned_to_id, recurrence_interval }) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await requireEditor(locals.db, list_id, locals.user.id);
@@ -56,7 +63,8 @@ export const addItem = form(
 			createdById: locals.user.id,
 			sortOrder: Date.now(),
 			dueDate: due_date,
-			assignedToId: assigned_to_id
+			assignedToId: assigned_to_id,
+			recurrenceInterval: recurrence_interval
 		});
 		void getItems().refresh();
 	}
