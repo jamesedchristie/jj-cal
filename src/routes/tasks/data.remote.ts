@@ -12,7 +12,7 @@ import type { RecurrenceInterval } from '$lib/server/db/schema';
 import * as v from 'valibot';
 
 const recurrenceField = v.pipe(
-	v.string(),
+	v.optional(v.string(), ''),
 	v.transform((s) => (s || null) as RecurrenceInterval | null)
 );
 
@@ -33,7 +33,7 @@ export const getTodoLists = query(async () => {
  * mode='mine' (default): items assigned to me or unassigned items I created.
  * mode='all':            every item in every accessible todo list.
  */
-export const getTaskItems = query(async (mode: 'mine' | 'all' = 'mine') => {
+export const getTaskItems = query(v.picklist(['mine', 'all']), async (mode) => {
 	const { locals } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
 	await getOrCreatePrimaryList(locals.db, locals.user.id);
@@ -70,8 +70,14 @@ export const addItem = form(
 	v.object({
 		list_id: v.pipe(v.string(), v.nonEmpty()),
 		text: v.pipe(v.string(), v.nonEmpty()),
-		due_date: v.pipe(v.string(), v.transform((s) => s || null)),
-		assigned_to_id: v.pipe(v.string(), v.transform((s) => s || null)),
+		due_date: v.pipe(
+			v.string(),
+			v.transform((s) => s || null)
+		),
+		assigned_to_id: v.pipe(
+			v.optional(v.string(), ''),
+			v.transform((s) => s || null)
+		),
 		recurrence_interval: recurrenceField
 	}),
 	async ({ list_id, text, due_date, assigned_to_id, recurrence_interval }) => {
@@ -94,7 +100,10 @@ export const addItem = form(
 export const toggleItem = form(
 	v.object({
 		id: v.pipe(v.string(), v.nonEmpty()),
-		completed: v.pipe(v.string(), v.transform((val) => val === 'true'))
+		completed: v.pipe(
+			v.string(),
+			v.transform((val) => val === 'true')
+		)
 	}),
 	async ({ id, completed }) => {
 		const { locals } = getRequestEvent();

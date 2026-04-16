@@ -13,7 +13,7 @@ import type { RecurrenceInterval } from '$lib/server/db/schema';
 import * as v from 'valibot';
 
 const recurrenceField = v.pipe(
-	v.string(),
+	v.optional(v.string(), ''),
 	v.transform((s) => (s || null) as RecurrenceInterval | null)
 );
 
@@ -49,8 +49,8 @@ export const addItem = form(
 	v.object({
 		list_id: v.pipe(v.string(), v.nonEmpty()),
 		text: v.pipe(v.string(), v.nonEmpty()),
-		due_date: v.pipe(v.string(), v.transform((s) => s || null)),
-		assigned_to_id: v.pipe(v.string(), v.transform((s) => s || null)),
+		due_date: v.pipe(v.optional(v.string(), ''), v.transform((s) => s || null)),
+		assigned_to_id: v.pipe(v.optional(v.string(), ''), v.transform((s) => s || null)),
 		recurrence_interval: recurrenceField
 	}),
 	async ({ list_id, text, due_date, assigned_to_id, recurrence_interval }) => {
