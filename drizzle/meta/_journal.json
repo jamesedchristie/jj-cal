@@ -99,6 +99,13 @@
       "when": 1776297600000,
       "tag": "0013_calendar_colour",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1776384000000,
+      "tag": "0014_recurring_events",
+      "breakpoints": true
     }
   ]
 }

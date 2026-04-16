@@ -3,7 +3,8 @@
 	import Button from '$lib/components/Button.svelte';
 	import Textarea from '$lib/components/Textarea.svelte';
 	import { tick } from 'svelte';
-	import { addEventToDate, editEvent, getCalendars, loadEvents, removeEvent, createNewCalendar } from './data.remote';
+	import { addEventToDate, cancelOccurrence, editEvent, getCalendars, loadEvents, overrideOccurrenceText, removeEvent, createNewCalendar } from './data.remote';
+	import type { EventRecurrenceRule } from '$lib/server/db/schema';
 	import { CalendarEvent } from './events.svelte';
 	import EventsList from './EventsList.svelte';
 	import { flip } from 'svelte/animate';
@@ -110,6 +111,8 @@
 	let effectiveCalendarId = $derived(newEventCalendarId ?? selectedCalendarId);
 
 	let editingText = $state('');
+	let newEventRepeat = $state<EventRecurrenceRule | ''>('');
+	let newEventEndsOn = $state('');
 	let showCreateCalendar = $state(false);
 	let newCalName = $state('');
 	let newCalSlug = $derived(newCalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
@@ -136,6 +139,7 @@
 
 	// ---- Mutations ----
 	async function createEvent(date: Date, text: string) {
+		const rule = newEventRepeat || null;
 		const newEvent: (typeof allMonthEvents)[number] = {
 			id: Infinity,
 			calendar_id: effectiveCalendarId,
@@ -145,28 +149,68 @@
 			datetime: date.getTime(),
 			text,
 			created_by_name: '',
-			created_by_id: ''
+			created_by_id: '',
+			recurrenceRule: rule,
+			isRecurring: !!rule,
+			baseEventId: null,
+			originalDatetime: null
 		};
 		await addEventToDate({
 			calendarId: effectiveCalendarId,
 			year: date.getFullYear(),
 			month: date.getMonth() + 1,
 			date: date.getDate(),
-			text
+			text,
+			recurrenceRule: rule,
+			recurrenceEndsOn: newEventEndsOn || null
 		}).updates(loadEvents({ year, month }).withOverride((events) => [...events, newEvent]));
+		newEventRepeat = '';
+		newEventEndsOn = '';
 		toastService().show(new ToastMessage('Event created!'));
 	}
 
 	async function editEventText(event: (typeof allMonthEvents)[number], text: string) {
-		if (!text.trim()) { await deleteEvent(event); return; }
-		await editEvent({ id: event.id, text }).updates(
-			loadEvents({ year, month }).withOverride((events) => events.map((e) => (e.id === event.id ? { ...e, text } : e)))
-		);
+		if (!text.trim()) {
+			if (event.isRecurring && event.baseEventId != null && event.originalDatetime != null) {
+				// Cancel this occurrence rather than deleting the whole series
+				await cancelThisOccurrence(event);
+			} else {
+				await deleteEvent(event);
+			}
+			return;
+		}
+		if (event.isRecurring && event.baseEventId != null && event.originalDatetime != null) {
+			// Override just this occurrence's text
+			await overrideOccurrenceText({ eventId: event.baseEventId, originalDatetime: event.originalDatetime, text }).updates(
+				loadEvents({ year, month }).withOverride((events) =>
+					events.map((e) =>
+						e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime
+							? { ...e, text }
+							: e
+					)
+				)
+			);
+		} else {
+			await editEvent({ id: event.id, text }).updates(
+				loadEvents({ year, month }).withOverride((events) => events.map((e) => (e.id === event.id ? { ...e, text } : e)))
+			);
+		}
 	}
 
 	async function deleteEvent(event: (typeof allMonthEvents)[number]) {
 		await removeEvent({ id: event.id }).updates(
 			loadEvents({ year, month }).withOverride((events) => events.filter((e) => e.id !== event.id))
+		);
+	}
+
+	async function cancelThisOccurrence(event: (typeof allMonthEvents)[number]) {
+		if (event.baseEventId == null || event.originalDatetime == null) return;
+		await cancelOccurrence({ eventId: event.baseEventId, originalDatetime: event.originalDatetime }).updates(
+			loadEvents({ year, month }).withOverride((events) =>
+				events.filter(
+					(e) => !(e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime)
+				)
+			)
 		);
 	}
 </script>
@@ -250,7 +294,7 @@
 	<!-- Upcoming events strip (current month only) -->
 	{#if upcomingEvents.length > 0}
 		<section class="upcoming">
-			{#each upcomingEvents as event (event.id)}
+			{#each upcomingEvents as event (event.isRecurring ? `${event.baseEventId}:${event.originalDatetime}` : event.id)}
 				<button type="button" class="upcoming-row" onclick={() => handleDateClick(new Date(event.datetime))}>
 					{#if event.calendar_colour}
 						<span class="upcoming-dot" style="background: var(--color-{event.calendar_colour})"></span>
@@ -282,13 +326,28 @@
 	<section class="events">
 		{#if selectedDateEvents.length}
 			<ul>
-				{#each selectedDateEvents as event (event.id)}
+				{#each selectedDateEvents as event (event.isRecurring ? `${event.baseEventId}:${event.originalDatetime}` : event.id)}
 					<li animate:flip>
 						<div class="event-input">
-							{#if event.calendar_colour}
-								<span class="event-cal-badge" style="background: var(--color-{event.calendar_colour})">{event.calendar_name}</span>
-							{/if}
+							<div class="event-meta">
+								{#if event.calendar_colour}
+									<span class="event-cal-badge" style="background: var(--color-{event.calendar_colour})">{event.calendar_name}</span>
+								{/if}
+								{#if event.isRecurring}
+									<span class="recurrence-badge" title="Recurring event">↻ {event.recurrenceRule}</span>
+								{/if}
+							</div>
 							<Textarea bind:value={event.text} onchange={() => editEventText(event, event.text || '')} style="width: 100%"></Textarea>
+							{#if event.isRecurring}
+								<div class="event-actions">
+									<button type="button" class="action-link danger" onclick={() => cancelThisOccurrence(event)}>
+										Cancel this date
+									</button>
+									<button type="button" class="action-link" onclick={() => deleteEvent(event)}>
+										Delete all
+									</button>
+								</div>
+							{/if}
 						</div>
 					</li>
 				{/each}
@@ -310,6 +369,21 @@
 		{/if}
 		<form onsubmit={(e) => { e.preventDefault(); if (selectedDate) createEvent(selectedDate, editingText); editingText = ''; }}>
 			<Textarea bind:value={editingText} placeholder="Add event…" style="width: 100%" onkeydown={(e) => { if (e.key === 'Enter' && e.metaKey) { e.preventDefault(); if (selectedDate) createEvent(selectedDate, editingText); editingText = ''; } }}></Textarea>
+			<div class="repeat-row">
+				<label class="repeat-label" for="repeat-select">Repeat</label>
+				<select id="repeat-select" class="repeat-select" bind:value={newEventRepeat}>
+					<option value="">No repeat</option>
+					<option value="daily">Daily</option>
+					<option value="weekly">Weekly</option>
+					<option value="fortnightly">Fortnightly</option>
+					<option value="monthly">Monthly</option>
+					<option value="yearly">Yearly</option>
+				</select>
+				{#if newEventRepeat}
+					<label class="repeat-label" for="ends-on-input">Ends</label>
+					<input id="ends-on-input" type="date" class="ends-on-input" bind:value={newEventEndsOn} placeholder="No end" />
+				{/if}
+			</div>
 			<div class="actions">
 				<Button type="submit" disabled={!editingText.length}>Add</Button>
 			</div>
@@ -676,6 +750,13 @@
 		font-family: var(--font-body);
 	}
 
+	.event-meta {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+	}
+
 	.event-cal-badge {
 		display: inline-block;
 		font-size: var(--font-size-xs);
@@ -685,6 +766,35 @@
 		padding: 2px var(--space-2);
 		border-radius: var(--radius-full);
 		line-height: var(--line-height-normal);
+	}
+
+	.recurrence-badge {
+		display: inline-flex;
+		align-items: center;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		gap: var(--space-1);
+	}
+
+	.event-actions {
+		display: flex;
+		gap: var(--space-3);
+	}
+
+	.action-link {
+		background: none;
+		border: none;
+		padding: 0;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+
+		&:hover { color: var(--color-text); }
+		&.danger:hover { color: var(--color-danger); }
 	}
 
 	.cal-picker {
@@ -728,5 +838,33 @@
 			justify-content: flex-end;
 			margin-top: var(--space-2);
 		}
+	}
+
+	.repeat-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin-top: var(--space-2);
+		flex-wrap: wrap;
+	}
+
+	.repeat-label {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+	}
+
+	.repeat-select,
+	.ends-on-input {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		padding: 2px var(--space-2);
+		outline: none;
+
+		&:focus { border-color: var(--color-accent); }
 	}
 </style>

@@ -1,4 +1,5 @@
 import type { getEventsForMonthAllCalendars } from '$lib/server/db/queries';
+import type { EventRecurrenceRule } from '$lib/server/db/schema';
 
 type EventRow = Awaited<ReturnType<typeof getEventsForMonthAllCalendars>>[number];
 
@@ -12,6 +13,10 @@ export class CalendarEvent {
 	calendar_colour: string | null;
 	created_by_name: string;
 	created_by_id: string;
+	recurrenceRule: EventRecurrenceRule | null;
+	isRecurring: boolean;
+	baseEventId: number | null;
+	originalDatetime: number | null;
 
 	constructor(e: EventRow) {
 		this.id = $state(e.id);
@@ -23,5 +28,9 @@ export class CalendarEvent {
 		this.calendar_colour = $state(e.calendar_colour);
 		this.created_by_name = $state(e.created_by_name);
 		this.created_by_id = $state(e.created_by_id);
+		this.recurrenceRule = $state(e.recurrenceRule);
+		this.isRecurring = $state(e.isRecurring);
+		this.baseEventId = $state(e.baseEventId);
+		this.originalDatetime = $state(e.originalDatetime);
 	}
 }

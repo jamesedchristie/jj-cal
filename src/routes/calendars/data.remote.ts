@@ -1,13 +1,16 @@
 import { command, form, getRequestEvent, query, requested } from '$app/server';
 import {
+	cancelEventOccurrence,
 	createCalendar,
 	createEvent,
 	deleteEvent,
 	getAllCalendars,
 	getCalendarBySlug,
 	getEventsForMonthAllCalendars,
+	overrideEventOccurrenceText,
 	updateEventText
 } from '$lib/server/db/queries';
+import type { EventRecurrenceRule } from '$lib/server/db/schema';
 import { redirect } from '@sveltejs/kit';
 import { Temporal } from 'temporal-polyfill';
 import * as v from 'valibot';
@@ -29,13 +32,17 @@ export const addEventToDate = command(
 		year,
 		month,
 		date,
-		text
+		text,
+		recurrenceRule,
+		recurrenceEndsOn
 	}: {
 		calendarId: number;
 		year: number;
 		month: number;
 		date: number;
 		text: string;
+		recurrenceRule?: EventRecurrenceRule | null;
+		recurrenceEndsOn?: string | null;
 	}) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) return { success: false };
@@ -55,7 +62,9 @@ export const addEventToDate = command(
 				datetime,
 				text,
 				created_by_name: locals.user.name,
-				created_by_id: locals.user.id
+				created_by_id: locals.user.id,
+				recurrenceRule: recurrenceRule ?? null,
+				recurrenceEndsOn: recurrenceEndsOn ?? null
 			});
 			for (const arg of requested(loadEvents, 1)) {
 				void loadEvents(arg).refresh();
@@ -95,6 +104,40 @@ export const removeEvent = command('unchecked', async ({ id }: { id: number }) =
 		return { success: false };
 	}
 });
+
+export const cancelOccurrence = command(
+	'unchecked',
+	async ({ eventId, originalDatetime }: { eventId: number; originalDatetime: number }) => {
+		const { locals } = getRequestEvent();
+		try {
+			await cancelEventOccurrence(locals.db, eventId, originalDatetime);
+			for (const arg of requested(loadEvents, 1)) {
+				void loadEvents(arg).refresh();
+			}
+			return { success: true };
+		} catch (err) {
+			console.log(err);
+			return { success: false };
+		}
+	}
+);
+
+export const overrideOccurrenceText = command(
+	'unchecked',
+	async ({ eventId, originalDatetime, text }: { eventId: number; originalDatetime: number; text: string }) => {
+		const { locals } = getRequestEvent();
+		try {
+			await overrideEventOccurrenceText(locals.db, eventId, originalDatetime, text);
+			for (const arg of requested(loadEvents, 1)) {
+				void loadEvents(arg).refresh();
+			}
+			return { success: true };
+		} catch (err) {
+			console.log(err);
+			return { success: false };
+		}
+	}
+);
 
 export const quickAddEventToday = command('unchecked', async ({ text }: { text: string }) => {
 	const { locals } = getRequestEvent();
