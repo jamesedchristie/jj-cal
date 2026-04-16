@@ -26,6 +26,15 @@
 
 	const webManifestLink = pwaInfo?.webManifest.linkTag ?? '';
 
+	async function handleLogout(e: SubmitEvent) {
+		e.preventDefault();
+		await fetch('/api/auth/sign-out', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' }
+		});
+		window.location.href = '/';
+	}
+
 	onMount(() => {
 		if ('serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -59,7 +68,7 @@
 						size="sm"
 					/>
 				</a>
-				<form method="post" action="/api/auth/sign-out">
+				<form method="post" onsubmit={handleLogout}>
 					<Button type="submit">Logout</Button>
 				</form>
 			{/if}
