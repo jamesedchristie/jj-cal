@@ -43,7 +43,7 @@
 <div class="layout-wrapper">
 	<header>
 		<a href={resolve('/calendars')}>
-			<h1>JJ Cal</h1>
+			<h1>Family Hub</h1>
 		</a>
 		<div class="header-right">
 			{#if data.user}
