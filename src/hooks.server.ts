@@ -41,20 +41,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = user;
 	event.locals.session = user ? session!.session : null;
 
-	// Guard calendar and task routes (and anything else we add later).
-	if (!user && event.url.pathname.startsWith('/calendars')) {
-		redirect(303, '/');
-	}
-	if (!user && event.url.pathname.startsWith('/tasks')) {
-		redirect(303, '/');
-	}
-	if (!user && event.url.pathname.startsWith('/lists')) {
+	// Guard all app routes — unauthenticated users go to the login page.
+	const appPaths = ['/calendars', '/tasks', '/lists', '/profile', '/budget'];
+	if (!user && appPaths.some((p) => event.url.pathname.startsWith(p))) {
 		redirect(303, '/');
 	}
 	// Admin routes: must be logged in AND be an admin.
 	if (event.url.pathname.startsWith('/admin')) {
 		if (!user) redirect(303, '/');
 		if (!user.isAdmin) redirect(303, '/calendars');
+		// /admin with no sub-path → redirect to the invites section.
+		if (event.url.pathname === '/admin' || event.url.pathname === '/admin/') {
+			redirect(303, '/admin/invites');
+		}
 	}
 
 	// Route /api/auth/* requests to better-auth; pass everything else through.

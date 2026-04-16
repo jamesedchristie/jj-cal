@@ -2,8 +2,9 @@ import { form, getRequestEvent, query } from '$app/server';
 import {
 	createListItem,
 	deleteListItem,
-	getListItems,
 	getOrCreatePrimaryList,
+	getTaskItemsForUser,
+	getTodoListsForUser,
 	getUsersBasic,
 	setListItemCompleted
 } from '$lib/server/db/queries';
@@ -15,17 +16,28 @@ const recurrenceField = v.pipe(
 	v.transform((s) => (s || null) as RecurrenceInterval | null)
 );
 
-export const getPrimaryList = query(async () => {
+/**
+ * All todo-type lists the user can access — used for the list picker in the add form.
+ * Ensures the user has at least a personal "My tasks" list via getOrCreatePrimaryList.
+ */
+export const getTodoLists = query(async () => {
 	const { locals } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
-	return getOrCreatePrimaryList(locals.db, locals.user.id);
+	// Ensure primary list exists before fetching
+	await getOrCreatePrimaryList(locals.db, locals.user.id);
+	return getTodoListsForUser(locals.db, locals.user.id);
 });
 
-export const getItems = query(async () => {
+/**
+ * Task items across all accessible todo lists.
+ * mode='mine' (default): items assigned to me or unassigned items I created.
+ * mode='all':            every item in every accessible todo list.
+ */
+export const getTaskItems = query(async (mode: 'mine' | 'all' = 'mine') => {
 	const { locals } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
-	const list = await getOrCreatePrimaryList(locals.db, locals.user.id);
-	return getListItems(locals.db, list.id);
+	await getOrCreatePrimaryList(locals.db, locals.user.id);
+	return getTaskItemsForUser(locals.db, locals.user.id, mode);
 });
 
 export const getUsers = query(async () => {
@@ -49,7 +61,8 @@ export const addItemToPrimaryList = form(
 			createdById: locals.user.id,
 			sortOrder: Date.now()
 		});
-		void getItems().refresh();
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
 	}
 );
 
@@ -73,7 +86,8 @@ export const addItem = form(
 			assignedToId: assigned_to_id,
 			recurrenceInterval: recurrence_interval
 		});
-		void getItems().refresh();
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
 	}
 );
 
@@ -86,7 +100,8 @@ export const toggleItem = form(
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await setListItemCompleted(locals.db, id, completed);
-		void getItems().refresh();
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
 	}
 );
 
@@ -96,6 +111,7 @@ export const removeItem = form(
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await deleteListItem(locals.db, id);
-		void getItems().refresh();
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
 	}
 );

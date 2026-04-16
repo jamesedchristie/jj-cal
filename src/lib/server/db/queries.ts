@@ -1,11 +1,13 @@
-import { and, asc, count, desc, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
 import {
 	calendarsTable,
+	eventExceptionsTable,
 	eventsTable,
 	invitesTable,
 	listItemsTable,
 	listsTable,
+	type EventRecurrenceRule,
 	type ListType,
 	type Permission,
 	type RecurrenceInterval,
@@ -65,9 +67,12 @@ export async function createCalendar(
 	input: { name: string; slug: string; created_by_name: string; created_by_id: string }
 ) {
 	const { name, slug, created_by_name, created_by_id } = input;
+	// Auto-assign a colour from the family palette based on how many calendars exist.
+	const existing = await db.select({ id: calendarsTable.id }).from(calendarsTable);
+	const colour = `family-${(existing.length % 8) + 1}`;
 	const calendar = await db
 		.insert(calendarsTable)
-		.values({ name, slug, created_by_name, created_by_id })
+		.values({ name, slug, created_by_name, created_by_id, colour })
 		.returning();
 	return calendar[0];
 }
@@ -91,9 +96,11 @@ export async function createEvent(
 		text: string;
 		created_by_name: string;
 		created_by_id: string;
+		recurrenceRule?: EventRecurrenceRule | null;
+		recurrenceEndsOn?: string | null;
 	}
 ) {
-	const { calendarSlug, calendarId, datetime, text, created_by_name, created_by_id } = input;
+	const { calendarSlug, calendarId, datetime, text, created_by_name, created_by_id, recurrenceRule, recurrenceEndsOn } = input;
 	const event = await db
 		.insert(eventsTable)
 		.values({
@@ -102,7 +109,9 @@ export async function createEvent(
 			datetime,
 			text,
 			created_by_name,
-			created_by_id
+			created_by_id,
+			recurrenceRule: recurrenceRule ?? null,
+			recurrenceEndsOn: recurrenceEndsOn ?? null
 		})
 		.returning();
 	return event[0];
@@ -422,4 +431,329 @@ export async function getEventsForMonth(
 			)
 		);
 	return events;
+}
+
+// ---------------------------------------------------------------------------
+// Recurrence engine
+// ---------------------------------------------------------------------------
+
+/** Advance a timestamp by one recurrence interval. */
+function advanceByRule(datetime: number, rule: EventRecurrenceRule): number {
+	const d = new Date(datetime);
+	switch (rule) {
+		case 'daily':       d.setDate(d.getDate() + 1);       break;
+		case 'weekly':      d.setDate(d.getDate() + 7);       break;
+		case 'fortnightly': d.setDate(d.getDate() + 14);      break;
+		case 'monthly':     d.setMonth(d.getMonth() + 1);     break;
+		case 'yearly':      d.setFullYear(d.getFullYear() + 1); break;
+	}
+	return d.getTime();
+}
+
+/**
+ * Generate all occurrence timestamps for a recurring event that fall within
+ * [windowStart, windowEnd). Respects recurrenceEndsOn.
+ */
+function generateOccurrences(
+	baseTime: number,
+	rule: EventRecurrenceRule,
+	endsOn: string | null | undefined,
+	windowStart: number,
+	windowEnd: number
+): number[] {
+	const endsOnMs = endsOn ? new Date(endsOn + 'T23:59:59').getTime() : Infinity;
+	const occurrences: number[] = [];
+	let t = baseTime;
+	// Advance past old occurrences efficiently for fixed-ms intervals
+	if (rule === 'daily' || rule === 'weekly' || rule === 'fortnightly') {
+		const stepMs = rule === 'daily' ? 86_400_000 : rule === 'weekly' ? 7 * 86_400_000 : 14 * 86_400_000;
+		if (t < windowStart) {
+			const steps = Math.floor((windowStart - t) / stepMs);
+			t += steps * stepMs;
+		}
+	}
+	// Collect occurrences within the window
+	while (t < windowEnd) {
+		if (t > endsOnMs) break;
+		if (t >= windowStart) occurrences.push(t);
+		t = advanceByRule(t, rule);
+	}
+	return occurrences;
+}
+
+export type CalendarEventRow = {
+	id: number;
+	calendar_id: number;
+	calendar_slug: string;
+	datetime: number;
+	text: string;
+	created_by_name: string;
+	created_by_id: string;
+	calendar_name: string;
+	calendar_colour: string | null;
+	// Recurrence metadata (null for one-off events)
+	recurrenceRule: EventRecurrenceRule | null;
+	isRecurring: boolean;
+	// For recurring instances: the base event id + original datetime (used for exceptions)
+	baseEventId: number | null;
+	originalDatetime: number | null;
+};
+
+/**
+ * Fetch events for a month across all calendars.
+ * Handles both regular events and recurring series (with exception support).
+ */
+export async function getEventsForMonthAllCalendars(
+	db: DrizzleClient,
+	year: number,
+	month: number
+): Promise<CalendarEventRow[]> {
+	const windowStart = new Date(year, month - 1, 1).getTime();
+	const windowEnd   = new Date(year, month, 1).getTime();
+
+	// 1. One-off events in the window
+	const oneOffRows = await db
+		.select({
+			id: eventsTable.id,
+			calendar_id: eventsTable.calendar_id,
+			calendar_slug: eventsTable.calendar_slug,
+			datetime: eventsTable.datetime,
+			text: eventsTable.text,
+			created_by_name: eventsTable.created_by_name,
+			created_by_id: eventsTable.created_by_id,
+			calendar_name: calendarsTable.name,
+			calendar_colour: calendarsTable.colour
+		})
+		.from(eventsTable)
+		.innerJoin(calendarsTable, eq(eventsTable.calendar_id, calendarsTable.id))
+		.where(
+			and(
+				isNull(eventsTable.recurrenceRule),
+				gt(eventsTable.datetime, windowStart),
+				lt(eventsTable.datetime, windowEnd)
+			)
+		);
+
+	const oneOff: CalendarEventRow[] = oneOffRows.map((r) => ({
+		...r,
+		recurrenceRule: null,
+		isRecurring: false,
+		baseEventId: null,
+		originalDatetime: null
+	}));
+
+	// 2. Recurring base events whose series could overlap the window
+	const recurringBase = await db
+		.select({
+			id: eventsTable.id,
+			calendar_id: eventsTable.calendar_id,
+			calendar_slug: eventsTable.calendar_slug,
+			datetime: eventsTable.datetime,
+			text: eventsTable.text,
+			created_by_name: eventsTable.created_by_name,
+			created_by_id: eventsTable.created_by_id,
+			calendar_name: calendarsTable.name,
+			calendar_colour: calendarsTable.colour,
+			recurrenceRule: eventsTable.recurrenceRule,
+			recurrenceEndsOn: eventsTable.recurrenceEndsOn
+		})
+		.from(eventsTable)
+		.innerJoin(calendarsTable, eq(eventsTable.calendar_id, calendarsTable.id))
+		.where(
+			and(
+				// Has a recurrence rule
+				isNull(eventsTable.recurrenceRule) ? undefined : gt(eventsTable.id, -1),
+				// Base event starts before the end of the window
+				lt(eventsTable.datetime, windowEnd)
+			)
+		)
+		// Re-fetch only rows where recurrenceRule IS NOT NULL
+		.then((rows) => rows.filter((r) => r.recurrenceRule != null));
+
+	if (recurringBase.length === 0) return oneOff;
+
+	// 3. Load all exceptions for these base events
+	const baseEventIds = recurringBase.map((r) => r.id);
+	const exceptions = await db
+		.select()
+		.from(eventExceptionsTable)
+		.where(inArray(eventExceptionsTable.eventId, baseEventIds));
+
+	// Key: `${eventId}:${originalDatetime}`
+	const exceptionMap = new Map(
+		exceptions.map((ex) => [`${ex.eventId}:${ex.originalDatetime}`, ex])
+	);
+
+	// 4. Generate instances, apply exceptions
+	const recurring: CalendarEventRow[] = [];
+	for (const base of recurringBase) {
+		const occurrences = generateOccurrences(
+			base.datetime,
+			base.recurrenceRule!,
+			base.recurrenceEndsOn,
+			windowStart,
+			windowEnd
+		);
+		for (const occ of occurrences) {
+			const key = `${base.id}:${occ}`;
+			const ex = exceptionMap.get(key);
+			if (ex?.isCancelled) continue;
+			recurring.push({
+				id: base.id,
+				calendar_id: base.calendar_id,
+				calendar_slug: base.calendar_slug,
+				datetime: occ,
+				text: ex?.overrideText ?? base.text,
+				created_by_name: base.created_by_name,
+				created_by_id: base.created_by_id,
+				calendar_name: base.calendar_name,
+				calendar_colour: base.calendar_colour,
+				recurrenceRule: base.recurrenceRule,
+				isRecurring: true,
+				baseEventId: base.id,
+				originalDatetime: occ
+			});
+		}
+	}
+
+	return [...oneOff, ...recurring];
+}
+
+// ---------------------------------------------------------------------------
+// Event exception mutations
+// ---------------------------------------------------------------------------
+
+/** Cancel a single occurrence of a recurring event. */
+export async function cancelEventOccurrence(
+	db: DrizzleClient,
+	eventId: number,
+	originalDatetime: number
+) {
+	const existing = await db
+		.select({ id: eventExceptionsTable.id })
+		.from(eventExceptionsTable)
+		.where(
+			and(
+				eq(eventExceptionsTable.eventId, eventId),
+				eq(eventExceptionsTable.originalDatetime, originalDatetime)
+			)
+		)
+		.limit(1);
+
+	if (existing[0]) {
+		await db
+			.update(eventExceptionsTable)
+			.set({ isCancelled: true })
+			.where(eq(eventExceptionsTable.id, existing[0].id));
+	} else {
+		await db.insert(eventExceptionsTable).values({
+			id: crypto.randomUUID(),
+			eventId,
+			originalDatetime,
+			isCancelled: true
+		});
+	}
+}
+
+/** Override the text of a single occurrence of a recurring event. */
+export async function overrideEventOccurrenceText(
+	db: DrizzleClient,
+	eventId: number,
+	originalDatetime: number,
+	text: string
+) {
+	const existing = await db
+		.select({ id: eventExceptionsTable.id })
+		.from(eventExceptionsTable)
+		.where(
+			and(
+				eq(eventExceptionsTable.eventId, eventId),
+				eq(eventExceptionsTable.originalDatetime, originalDatetime)
+			)
+		)
+		.limit(1);
+
+	if (existing[0]) {
+		await db
+			.update(eventExceptionsTable)
+			.set({ overrideText: text, isCancelled: false })
+			.where(eq(eventExceptionsTable.id, existing[0].id));
+	} else {
+		await db.insert(eventExceptionsTable).values({
+			id: crypto.randomUUID(),
+			eventId,
+			originalDatetime,
+			isCancelled: false,
+			overrideText: text
+		});
+	}
+}
+
+/**
+ * All todo-type lists the user has access to (owned + shared), with role.
+ */
+export async function getTodoListsForUser(db: DrizzleClient, userId: string) {
+	const owned = await db
+		.select()
+		.from(listsTable)
+		.where(and(eq(listsTable.createdById, userId), eq(listsTable.type, 'todo')))
+		.orderBy(asc(listsTable.createdAt));
+
+	const shares = await db
+		.select({ resourceId: resourceSharesTable.resourceId, permission: resourceSharesTable.permission })
+		.from(resourceSharesTable)
+		.where(
+			and(eq(resourceSharesTable.resourceType, 'list'), eq(resourceSharesTable.userId, userId))
+		);
+
+	const sharedIds = shares.map((s) => s.resourceId);
+	const sharedTodoLists =
+		sharedIds.length > 0
+			? await db
+					.select()
+					.from(listsTable)
+					.where(and(inArray(listsTable.id, sharedIds), eq(listsTable.type, 'todo')))
+			: [];
+
+	const sharePermMap = new Map(shares.map((s) => [s.resourceId, s.permission as Permission]));
+
+	return [
+		...owned.map((l) => ({ ...l, role: 'owner' as const })),
+		...sharedTodoLists.map((l) => ({ ...l, role: sharePermMap.get(l.id)! }))
+	];
+}
+
+/**
+ * All task items from accessible todo-type lists.
+ * mode='mine': items assigned to userId, or unassigned items created by userId.
+ * mode='all':  every item in every accessible todo list.
+ */
+export async function getTaskItemsForUser(
+	db: DrizzleClient,
+	userId: string,
+	mode: 'mine' | 'all'
+) {
+	const todoLists = await getTodoListsForUser(db, userId);
+	if (todoLists.length === 0) return [];
+	const listIds = todoLists.map((l) => l.id);
+
+	const listNameMap = new Map(todoLists.map((l) => [l.id, l.name]));
+
+	const rows = await db
+		.select()
+		.from(listItemsTable)
+		.where(
+			and(
+				inArray(listItemsTable.listId, listIds),
+				mode === 'mine'
+					? or(
+							eq(listItemsTable.assignedToId, userId),
+							and(isNull(listItemsTable.assignedToId), eq(listItemsTable.createdById, userId))
+						)
+					: undefined
+			)
+		)
+		.orderBy(asc(listItemsTable.sortOrder), asc(listItemsTable.createdAt));
+
+	return rows.map((item) => ({ ...item, listName: listNameMap.get(item.listId) ?? '' }));
 }
