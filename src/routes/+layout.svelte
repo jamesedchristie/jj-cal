@@ -67,8 +67,10 @@
 	<main>
 		{@render children?.()}
 	</main>
-	<FAB />
-	<BottomNav />
+	{#if data.user}
+		<FAB />
+		<BottomNav />
+	{/if}
 </div>
 
 <style>

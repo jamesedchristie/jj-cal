@@ -218,23 +218,21 @@
 <div class="calendar-wrapper">
 
 	<!-- Filter chips -->
-	{#if calendars.length > 0}
-		<section class="filter-bar">
-			{#each calendars as cal (cal.id)}
-				<button
-					type="button"
-					class="filter-chip"
-					class:dimmed={hiddenCalendarIds.has(cal.id)}
-					onclick={() => toggleCalendarFilter(cal.id)}
-					style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})"
-				>
-					<span class="chip-dot"></span>
-					{cal.name}
-				</button>
-			{/each}
-			<button type="button" class="add-cal-btn" onclick={() => (showCreateCalendar = !showCreateCalendar)} aria-label="Add calendar">+</button>
-		</section>
-	{/if}
+	<section class="filter-bar">
+		{#each calendars as cal (cal.id)}
+			<button
+				type="button"
+				class="filter-chip"
+				class:dimmed={hiddenCalendarIds.has(cal.id)}
+				onclick={() => toggleCalendarFilter(cal.id)}
+				style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})"
+			>
+				<span class="chip-dot"></span>
+				{cal.name}
+			</button>
+		{/each}
+		<button type="button" class="add-cal-btn" onclick={() => (showCreateCalendar = !showCreateCalendar)} aria-label="Add calendar">+</button>
+	</section>
 
 	{#if showCreateCalendar}
 		<section class="create-calendar">
@@ -245,6 +243,14 @@
 				<Button onclick={() => (showCreateCalendar = false)}>Cancel</Button>
 			</form>
 		</section>
+	{/if}
+
+	<!-- Empty state when no calendars exist -->
+	{#if calendars.length === 0 && !showCreateCalendar}
+		<div class="no-calendars">
+			<p>No calendars yet.</p>
+			<button type="button" onclick={() => (showCreateCalendar = true)}>Create your first calendar →</button>
+		</div>
 	{/if}
 
 	<!-- Grid -->
@@ -385,7 +391,7 @@
 				{/if}
 			</div>
 			<div class="actions">
-				<Button type="submit" disabled={!editingText.length}>Add</Button>
+				<Button type="submit" disabled={!editingText.length || calendars.length === 0}>Add</Button>
 			</div>
 		</form>
 	</section>
@@ -432,6 +438,29 @@
 		}
 
 		&.dimmed { opacity: 0.35; }
+	}
+
+	.no-calendars {
+		flex: auto;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-3);
+		color: var(--color-text-subtle);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+
+		button {
+			background: none;
+			border: none;
+			cursor: pointer;
+			color: var(--color-accent);
+			font-size: var(--font-size-sm);
+			font-family: var(--font-body);
+			text-decoration: underline;
+			text-underline-offset: 2px;
+		}
 	}
 
 	.add-cal-btn {

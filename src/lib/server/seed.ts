@@ -11,6 +11,7 @@
 import { eq } from 'drizzle-orm';
 import type { Auth } from './auth';
 import type { DrizzleClient } from './db';
+import { createCalendar } from './db/queries';
 import { usersTable } from './db/schema';
 
 export async function maybeSeedAdmin(
@@ -48,5 +49,13 @@ export async function maybeSeedAdmin(
 	// Promote to admin — better-auth doesn't expose isAdmin through signUpEmail.
 	await db.update(usersTable).set({ isAdmin: true }).where(eq(usersTable.id, result.user.id));
 
-	console.log(`[seed] Admin user "${username}" created.`);
+	// Create a default "Family" calendar so the first admin has a working calendar.
+	await createCalendar(db, {
+		name: 'Family',
+		slug: 'family',
+		created_by_name: username,
+		created_by_id: result.user.id
+	});
+
+	console.log(`[seed] Admin user "${username}" and "Family" calendar created.`);
 }
