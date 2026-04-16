@@ -3,8 +3,9 @@
 title: Offline support (cached reads)
 status: draft
 type: feature
+priority: deferred
 created_at: 2026-04-12T06:20:14Z
-updated_at: 2026-04-12T06:20:14Z
+updated_at: 2026-04-16T22:07:53Z
 parent: jj-cal-5iy9
 ---
 

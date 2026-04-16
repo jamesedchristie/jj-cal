@@ -1,12 +1,11 @@
 import { command, form, getRequestEvent, query, requested } from '$app/server';
 import {
-	cancelEventOccurrence,
 	createCalendar,
 	createEvent,
 	deleteEvent,
+	deleteFutureEvents,
 	getAllCalendars,
 	getEventsForMonthAllCalendars,
-	overrideEventOccurrenceText,
 	updateEventText
 } from '$lib/server/db/queries';
 import type { EventRecurrenceRule } from '$lib/server/db/schema';
@@ -110,37 +109,18 @@ export const removeEvent = command('unchecked', async ({ id }: { id: number }) =
 	}
 });
 
-export const cancelOccurrence = command(
-	'unchecked',
-	async ({ eventId, originalDatetime }: { eventId: number; originalDatetime: number }) => {
-		const { locals } = getRequestEvent();
-		try {
-			await cancelEventOccurrence(locals.db, eventId, originalDatetime);
-			for (const arg of requested(loadEvents, 1)) {
-				void loadEvents(arg).refresh();
-			}
-			return { success: true };
-		} catch (err) {
-			console.log(err);
-			return { success: false };
-		}
-	}
-);
-
-export const overrideOccurrenceText = command(
+export const removeFutureEvents = command(
 	'unchecked',
 	async ({
-		eventId,
-		originalDatetime,
-		text
+		recurrenceGroupId,
+		fromDatetime
 	}: {
-		eventId: number;
-		originalDatetime: number;
-		text: string;
+		recurrenceGroupId: string;
+		fromDatetime: number;
 	}) => {
 		const { locals } = getRequestEvent();
 		try {
-			await overrideEventOccurrenceText(locals.db, eventId, originalDatetime, text);
+			await deleteFutureEvents(locals.db, recurrenceGroupId, fromDatetime);
 			for (const arg of requested(loadEvents, 1)) {
 				void loadEvents(arg).refresh();
 			}

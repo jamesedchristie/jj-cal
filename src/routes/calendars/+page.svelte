@@ -11,12 +11,11 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import {
 		addEventToDate,
-		cancelOccurrence,
 		createNewCalendar,
 		editEvent,
 		getCalendars,
 		loadEvents,
-		overrideOccurrenceText,
+		removeFutureEvents,
 		removeEvent
 	} from './data.remote';
 	import { CalendarEvent } from './events.svelte';
@@ -180,10 +179,8 @@
 			text,
 			created_by_name: '',
 			created_by_id: '',
-			recurrenceRule: rule,
 			isRecurring: !!rule,
-			baseEventId: null,
-			originalDatetime: null
+			recurrenceGroupId: null
 		};
 		await addEventToDate({
 			calendarId: effectiveCalendarId,
@@ -201,54 +198,31 @@
 
 	async function editEventText(event: (typeof allMonthEvents)[number], text: string) {
 		if (!text.trim()) {
-			if (event.isRecurring && event.baseEventId != null && event.originalDatetime != null) {
-				// Cancel this occurrence rather than deleting the whole series
-				await cancelThisOccurrence(event);
-			} else {
-				await deleteEvent(event);
-			}
+			await deleteThisEvent(event);
 			return;
 		}
-		if (event.isRecurring && event.baseEventId != null && event.originalDatetime != null) {
-			// Override just this occurrence's text
-			await overrideOccurrenceText({
-				eventId: event.baseEventId,
-				originalDatetime: event.originalDatetime,
-				text
-			}).updates(
-				loadEvents({ year, month }).withOverride((events) =>
-					events.map((e) =>
-						e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime
-							? { ...e, text }
-							: e
-					)
-				)
-			);
-		} else {
-			await editEvent({ id: event.id, text }).updates(
-				loadEvents({ year, month }).withOverride((events) =>
-					events.map((e) => (e.id === event.id ? { ...e, text } : e))
-				)
-			);
-		}
+		await editEvent({ id: event.id, text }).updates(
+			loadEvents({ year, month }).withOverride((events) =>
+				events.map((e) => (e.id === event.id ? { ...e, text } : e))
+			)
+		);
 	}
 
-	async function deleteEvent(event: (typeof allMonthEvents)[number]) {
+	async function deleteThisEvent(event: (typeof allMonthEvents)[number]) {
 		await removeEvent({ id: event.id }).updates(
 			loadEvents({ year, month }).withOverride((events) => events.filter((e) => e.id !== event.id))
 		);
 	}
 
-	async function cancelThisOccurrence(event: (typeof allMonthEvents)[number]) {
-		if (event.baseEventId == null || event.originalDatetime == null) return;
-		await cancelOccurrence({
-			eventId: event.baseEventId,
-			originalDatetime: event.originalDatetime
+	async function deleteThisAndFuture(event: (typeof allMonthEvents)[number]) {
+		if (!event.recurrenceGroupId) return;
+		await removeFutureEvents({
+			recurrenceGroupId: event.recurrenceGroupId,
+			fromDatetime: event.datetime
 		}).updates(
 			loadEvents({ year, month }).withOverride((events) =>
 				events.filter(
-					(e) =>
-						!(e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime)
+					(e) => !(e.recurrenceGroupId === event.recurrenceGroupId && e.datetime >= event.datetime)
 				)
 			)
 		);
@@ -357,7 +331,7 @@
 	<!-- Upcoming events strip (current month only) -->
 	{#if upcomingEvents.length > 0}
 		<section class="upcoming">
-			{#each upcomingEvents as event (event.isRecurring ? `${event.baseEventId}:${event.originalDatetime}` : event.id)}
+			{#each upcomingEvents as event (event.isRecurring ? `${event.recurrenceGroupId}:${event.datetime}` : event.id)}
 				<button
 					type="button"
 					class="upcoming-row"
@@ -402,7 +376,7 @@
 	<section class="events">
 		{#if selectedDateEvents.length}
 			<ul>
-				{#each selectedDateEvents as event (event.isRecurring ? `${event.baseEventId}:${event.originalDatetime}` : event.id)}
+				{#each selectedDateEvents as event (event.isRecurring ? `${event.recurrenceGroupId}:${event.datetime}` : event.id)}
 					<li animate:flip>
 						<div class="event-input">
 							<div class="event-meta">
@@ -414,9 +388,7 @@
 									>
 								{/if}
 								{#if event.isRecurring}
-									<span class="recurrence-badge" title="Recurring event"
-										>↻ {event.recurrenceRule}</span
-									>
+									<span class="recurrence-badge" title="Recurring event">↻</span>
 								{/if}
 							</div>
 							<Textarea
@@ -429,12 +401,16 @@
 									<button
 										type="button"
 										class="action-link danger"
-										onclick={() => cancelThisOccurrence(event)}
+										onclick={() => deleteThisEvent(event)}
 									>
-										Cancel this date
+										Delete this
 									</button>
-									<button type="button" class="action-link" onclick={() => deleteEvent(event)}>
-										Delete all
+									<button
+										type="button"
+										class="action-link danger"
+										onclick={() => deleteThisAndFuture(event)}
+									>
+										Delete future
 									</button>
 								</div>
 							{/if}

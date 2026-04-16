@@ -99,23 +99,8 @@ export const eventsTable = sqliteTable('event', {
 	text: text('text').notNull(),
 	created_by_name: text('created_by_name').notNull(),
 	created_by_id: text('created_by_id').notNull(),
-	// Recurrence — null means a one-off event
-	recurrenceRule: text('recurrence_rule', { enum: EVENT_RECURRENCE_RULES }),
-	recurrenceEndsOn: text('recurrence_ends_on') // YYYY-MM-DD, inclusive
-});
-
-/**
- * One row per modified or cancelled occurrence of a recurring event.
- * Keyed by (eventId, originalDatetime) — the original epoch ms of that occurrence.
- */
-export const eventExceptionsTable = sqliteTable('event_exception', {
-	id: text('id').primaryKey(),
-	eventId: integer('event_id').notNull().references(() => eventsTable.id, { onDelete: 'cascade' }),
-	// The epoch-ms datetime of the occurrence this exception targets
-	originalDatetime: integer('original_datetime').notNull(),
-	isCancelled: integer('is_cancelled', { mode: 'boolean' }).notNull().default(false),
-	// If non-null, this occurrence shows different text
-	overrideText: text('override_text')
+	// Recurrence — null means a one-off event. All occurrences in a series share the same UUID.
+	recurrenceGroupId: text('recurrence_group_id')
 });
 
 // jj-cal-o6bu / jj-cal-m3vk: generic lists model
