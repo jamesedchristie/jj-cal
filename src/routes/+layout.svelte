@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
+	import { authClient } from '$lib/auth-client';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FAB from '$lib/components/FAB.svelte';
@@ -28,11 +29,13 @@
 
 	async function handleLogout(e: SubmitEvent) {
 		e.preventDefault();
-		await fetch('/api/auth/sign-out', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' }
+		await authClient.signOut({
+			fetchOptions: {
+				onSuccess() {
+					window.location.href = resolve('/'); // Redirect to home or login page after logout
+				}
+			}
 		});
-		window.location.href = '/';
 	}
 
 	onMount(() => {
