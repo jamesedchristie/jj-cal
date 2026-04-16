@@ -4,15 +4,14 @@
 	import type { ListType } from '$lib/server/db/schema';
 
 	const lists = $derived(await getLists());
+	const taskLists = $derived(lists.filter((l) => l.type === 'todo'));
+	const otherLists = $derived(lists.filter((l) => l.type !== 'todo'));
 
 	let showForm = $state(false);
 	let selectedType = $state<ListType>('shopping');
 
+	// Ordered for display: shopping first (most common), todo last (auto-created for personal use)
 	const typeConfig: Record<ListType, { label: string; icon: string }> = {
-		todo: {
-			label: 'Todo',
-			icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
-		},
 		shopping: {
 			label: 'Shopping',
 			icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`
@@ -24,6 +23,10 @@
 		custom: {
 			label: 'Custom',
 			icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="18" r="1" fill="currentColor" stroke="none"/></svg>`
+		},
+		todo: {
+			label: 'Task list',
+			icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
 		}
 	};
 </script>
@@ -83,27 +86,65 @@
 	{#if lists.length === 0 && !showForm}
 		<p class="empty">No lists yet. Create one to get started.</p>
 	{:else}
-		<ul class="list-cards">
-			{#each lists as list (list.id)}
-				{@const cfg = typeConfig[list.type]}
-				<li>
-					<a href={resolve(`/lists/${list.id}`)} class="card">
-						<span class="card-icon">{@html cfg.icon}</span>
-						<span class="card-name">{list.name}</span>
-						{#if list.role !== 'owner'}
-							<span class="card-shared">Shared</span>
-						{/if}
-						<span class="card-type">{cfg.label}</span>
-						{#if list.incompleteCount > 0}
-							<span class="card-count">{list.incompleteCount}</span>
-						{/if}
-						<svg class="card-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-							<polyline points="9 18 15 12 9 6"/>
-						</svg>
-					</a>
-				</li>
-			{/each}
-		</ul>
+		<!-- Task lists — todo-type, also surfaced in the Tasks tab -->
+		{#if taskLists.length > 0}
+			<div class="section">
+				<div class="section-header">
+					<span class="section-label">Task lists</span>
+					<a href={resolve('/tasks')} class="section-link">View in Tasks →</a>
+				</div>
+				<ul class="list-cards">
+					{#each taskLists as list (list.id)}
+						{@const cfg = typeConfig[list.type]}
+						<li>
+							<a href={resolve(`/lists/${list.id}`)} class="card card--task">
+								<span class="card-icon">{@html cfg.icon}</span>
+								<span class="card-name">{list.name}</span>
+								{#if list.role !== 'owner'}
+									<span class="card-shared">Shared</span>
+								{/if}
+								{#if list.incompleteCount > 0}
+									<span class="card-count">{list.incompleteCount}</span>
+								{/if}
+								<svg class="card-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<polyline points="9 18 15 12 9 6"/>
+								</svg>
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+
+		<!-- Other lists — shopping, packing, custom -->
+		{#if otherLists.length > 0}
+			{#if taskLists.length > 0}
+				<div class="section-header">
+					<span class="section-label">Lists</span>
+				</div>
+			{/if}
+			<ul class="list-cards">
+				{#each otherLists as list (list.id)}
+					{@const cfg = typeConfig[list.type]}
+					<li>
+						<a href={resolve(`/lists/${list.id}`)} class="card">
+							<span class="card-icon">{@html cfg.icon}</span>
+							<span class="card-name">{list.name}</span>
+							{#if list.role !== 'owner'}
+								<span class="card-shared">Shared</span>
+							{/if}
+							<span class="card-type">{cfg.label}</span>
+							{#if list.incompleteCount > 0}
+								<span class="card-count">{list.incompleteCount}</span>
+							{/if}
+							<svg class="card-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<polyline points="9 18 15 12 9 6"/>
+							</svg>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	{/if}
 </div>
 
@@ -260,6 +301,37 @@
 		margin-top: var(--space-12);
 	}
 
+	.section {
+		margin-bottom: var(--space-2);
+	}
+
+	.section-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: var(--space-2) var(--space-2) var(--space-1);
+	}
+
+	.section-label {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-subtle);
+		text-transform: uppercase;
+		letter-spacing: var(--letter-spacing-wide);
+	}
+
+	.section-link {
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-accent);
+		text-decoration: none;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+
 	.list-cards {
 		display: flex;
 		flex-direction: column;
@@ -279,6 +351,10 @@
 		&:active {
 			background: var(--color-surface-sunken);
 		}
+	}
+
+	.card--task {
+		background: var(--color-surface-sunken);
 	}
 
 	.card-icon {
