@@ -1,13 +1,22 @@
 <script lang="ts">
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import { isEffectivelyComplete, INTERVAL_LABELS, RECURRENCE_INTERVALS } from '$lib/recurrence';
-	import { addItem, getItems, getPrimaryList, getUsers, removeItem, toggleItem } from './data.remote';
+	import { addItem, getTaskItems, getTodoLists, getUsers, removeItem, toggleItem } from './data.remote';
 
-	const list = $derived(await getPrimaryList());
-	const allItems = $derived(await getItems());
+	// 'mine' = tasks assigned to me or unassigned ones I created
+	// 'all'  = every task in every accessible todo list
+	let viewMode = $state<'mine' | 'all'>('mine');
+
+	const allItems = $derived(await getTaskItems(viewMode));
 	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
 	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
+
+	const todoLists = $derived(await getTodoLists());
 	const users = $derived(await getUsers());
+
+	// Default add-form target: the user's first owned list (or first accessible)
+	let selectedListId = $state<string | null>(null);
+	let effectiveListId = $derived(selectedListId ?? todoLists[0]?.id ?? '');
 
 	// Today's date in Sydney time as YYYY-MM-DD
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
@@ -34,7 +43,23 @@
 </script>
 
 <div class="page">
-	<h1>{list.name}</h1>
+	<div class="page-header">
+		<h1>Tasks</h1>
+		<div class="view-toggle">
+			<button
+				type="button"
+				class="toggle-btn"
+				class:active={viewMode === 'mine'}
+				onclick={() => (viewMode = 'mine')}
+			>Mine</button>
+			<button
+				type="button"
+				class="toggle-btn"
+				class:active={viewMode === 'all'}
+				onclick={() => (viewMode = 'all')}
+			>All</button>
+		</div>
+	</div>
 
 	<form
 		{...addItem.enhance(async ({ form, submit }) => {
@@ -45,7 +70,7 @@
 		})}
 		class="add-form"
 	>
-		<input {...addItem.fields.list_id.as('hidden', list.id)} />
+		<input {...addItem.fields.list_id.as('hidden', effectiveListId)} />
 
 		<div class="add-row">
 			<input
@@ -61,10 +86,26 @@
 			</button>
 		</div>
 
+		{#if todoLists.length > 1}
+			<div class="add-meta add-list">
+				<span class="meta-label">List</span>
+				<div class="list-row">
+					{#each todoLists as l (l.id)}
+						<button
+							type="button"
+							class="list-btn"
+							class:selected={effectiveListId === l.id}
+							onclick={() => (selectedListId = l.id)}
+						>{l.name}</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		{#if users.length > 0}
 			<div class="add-meta add-assignee">
 				<input {...addItem.fields.assigned_to_id.as('hidden', selectedAssigneeId ?? '')} />
-				<span class="meta-label">Assign to</span>
+				<span class="meta-label">Assign</span>
 				<div class="assignee-row">
 					{#each users as u (u.id)}
 						<button
@@ -135,6 +176,9 @@
 					</button>
 				</form>
 				<span class="text">{item.text}</span>
+				{#if viewMode === 'all' && item.listName}
+					<span class="list-chip">{item.listName}</span>
+				{/if}
 				{#if item.dueDate}
 					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
 				{/if}
@@ -218,12 +262,42 @@
 		overflow: hidden;
 	}
 
-	h1 {
+	.page-header {
 		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		padding: var(--space-4) var(--space-4) var(--space-2);
+	}
+
+	h1 {
 		font-size: var(--font-size-lg);
 		font-family: var(--font-heading);
 		font-weight: var(--font-weight-bold);
+	}
+
+	.view-toggle {
+		display: flex;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		overflow: hidden;
+	}
+
+	.toggle-btn {
+		background: none;
+		border: none;
+		padding: var(--space-1) var(--space-3);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
+
+		&.active {
+			background: var(--color-primary);
+			color: var(--color-primary-text);
+		}
 	}
 
 	.add-form {
@@ -287,7 +361,9 @@
 		gap: var(--space-2);
 	}
 
-	.add-assignee {
+	.add-assignee,
+	.add-list,
+	.add-recurrence {
 		padding: var(--space-2) var(--space-3);
 	}
 
@@ -298,10 +374,31 @@
 		white-space: nowrap;
 	}
 
-	.assignee-row {
+	.list-row,
+	.assignee-row,
+	.recurrence-row {
 		display: flex;
 		gap: var(--space-1);
 		flex-wrap: wrap;
+	}
+
+	.list-btn {
+		background: var(--color-surface-sunken);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		padding: var(--space-1) var(--space-2);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
+
+		&.selected {
+			background: var(--color-primary);
+			border-color: var(--color-primary);
+			color: var(--color-primary-text);
+		}
 	}
 
 	.assignee-btn {
@@ -354,6 +451,31 @@
 			&::-webkit-calendar-picker-indicator {
 				display: none;
 			}
+		}
+	}
+
+	.recurrence-btn {
+		background: var(--color-surface-sunken);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		padding: var(--space-1) var(--space-2);
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard),
+			border-color var(--duration-fast) var(--ease-standard);
+
+		&:hover {
+			background: var(--color-surface-raised);
+			color: var(--color-text);
+		}
+
+		&.selected {
+			background: var(--color-primary);
+			border-color: var(--color-primary);
+			color: var(--color-primary-text);
 		}
 	}
 
@@ -421,6 +543,17 @@
 		}
 	}
 
+	.list-chip {
+		flex: none;
+		font-size: var(--font-size-xs);
+		font-family: var(--font-body);
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface-sunken);
+		color: var(--color-text-subtle);
+		white-space: nowrap;
+	}
+
 	.due-chip {
 		flex: none;
 		font-size: var(--font-size-xs);
@@ -483,41 +616,6 @@
 	li:hover .delete,
 	li:focus-within .delete {
 		opacity: 1;
-	}
-
-	.add-recurrence {
-		padding: var(--space-2) var(--space-3);
-	}
-
-	.recurrence-row {
-		display: flex;
-		gap: var(--space-1);
-		flex-wrap: wrap;
-	}
-
-	.recurrence-btn {
-		background: var(--color-surface-sunken);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-full);
-		padding: var(--space-1) var(--space-2);
-		font-size: var(--font-size-xs);
-		font-family: var(--font-body);
-		color: var(--color-text-muted);
-		cursor: pointer;
-		transition: background var(--duration-fast) var(--ease-standard),
-			color var(--duration-fast) var(--ease-standard),
-			border-color var(--duration-fast) var(--ease-standard);
-
-		&:hover {
-			background: var(--color-surface-raised);
-			color: var(--color-text);
-		}
-
-		&.selected {
-			background: var(--color-primary);
-			border-color: var(--color-primary);
-			color: var(--color-primary-text);
-		}
 	}
 
 	.recurrence-chip {

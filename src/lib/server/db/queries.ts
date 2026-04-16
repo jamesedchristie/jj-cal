@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, lt } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
 import {
 	calendarsTable,
@@ -65,9 +65,12 @@ export async function createCalendar(
 	input: { name: string; slug: string; created_by_name: string; created_by_id: string }
 ) {
 	const { name, slug, created_by_name, created_by_id } = input;
+	// Auto-assign a colour from the family palette based on how many calendars exist.
+	const existing = await db.select({ id: calendarsTable.id }).from(calendarsTable);
+	const colour = `family-${(existing.length % 8) + 1}`;
 	const calendar = await db
 		.insert(calendarsTable)
-		.values({ name, slug, created_by_name, created_by_id })
+		.values({ name, slug, created_by_name, created_by_id, colour })
 		.returning();
 	return calendar[0];
 }
@@ -422,4 +425,101 @@ export async function getEventsForMonth(
 			)
 		);
 	return events;
+}
+
+/**
+ * Fetch events for a month across all calendars, joined with the calendar's
+ * colour and name so the UI can tint events per-calendar.
+ */
+export async function getEventsForMonthAllCalendars(
+	db: DrizzleClient,
+	year: number,
+	month: number
+) {
+	const startOfMonth = new Date(year, month - 1, 1).getTime();
+	const endOfMonth = new Date(year, month, 1).getTime();
+	return db
+		.select({
+			id: eventsTable.id,
+			calendar_id: eventsTable.calendar_id,
+			calendar_slug: eventsTable.calendar_slug,
+			datetime: eventsTable.datetime,
+			text: eventsTable.text,
+			created_by_name: eventsTable.created_by_name,
+			created_by_id: eventsTable.created_by_id,
+			calendar_name: calendarsTable.name,
+			calendar_colour: calendarsTable.colour
+		})
+		.from(eventsTable)
+		.innerJoin(calendarsTable, eq(eventsTable.calendar_id, calendarsTable.id))
+		.where(and(gt(eventsTable.datetime, startOfMonth), lt(eventsTable.datetime, endOfMonth)));
+}
+
+/**
+ * All todo-type lists the user has access to (owned + shared), with role.
+ */
+export async function getTodoListsForUser(db: DrizzleClient, userId: string) {
+	const owned = await db
+		.select()
+		.from(listsTable)
+		.where(and(eq(listsTable.createdById, userId), eq(listsTable.type, 'todo')))
+		.orderBy(asc(listsTable.createdAt));
+
+	const shares = await db
+		.select({ resourceId: resourceSharesTable.resourceId, permission: resourceSharesTable.permission })
+		.from(resourceSharesTable)
+		.where(
+			and(eq(resourceSharesTable.resourceType, 'list'), eq(resourceSharesTable.userId, userId))
+		);
+
+	const sharedIds = shares.map((s) => s.resourceId);
+	const sharedTodoLists =
+		sharedIds.length > 0
+			? await db
+					.select()
+					.from(listsTable)
+					.where(and(inArray(listsTable.id, sharedIds), eq(listsTable.type, 'todo')))
+			: [];
+
+	const sharePermMap = new Map(shares.map((s) => [s.resourceId, s.permission as Permission]));
+
+	return [
+		...owned.map((l) => ({ ...l, role: 'owner' as const })),
+		...sharedTodoLists.map((l) => ({ ...l, role: sharePermMap.get(l.id)! }))
+	];
+}
+
+/**
+ * All task items from accessible todo-type lists.
+ * mode='mine': items assigned to userId, or unassigned items created by userId.
+ * mode='all':  every item in every accessible todo list.
+ */
+export async function getTaskItemsForUser(
+	db: DrizzleClient,
+	userId: string,
+	mode: 'mine' | 'all'
+) {
+	const todoLists = await getTodoListsForUser(db, userId);
+	if (todoLists.length === 0) return [];
+	const listIds = todoLists.map((l) => l.id);
+
+	const listNameMap = new Map(todoLists.map((l) => [l.id, l.name]));
+
+	const rows = await db
+		.select()
+		.from(listItemsTable)
+		.where(
+			and(
+				inArray(listItemsTable.listId, listIds),
+				mode === 'mine'
+					? or(
+							eq(listItemsTable.assignedToId, userId),
+							and(isNull(listItemsTable.assignedToId), eq(listItemsTable.createdById, userId))
+						)
+					: undefined
+			)
+		)
+		.orderBy(asc(listItemsTable.sortOrder), asc(listItemsTable.createdAt));
+
+	return rows.map((item) => ({ ...item, listName: listNameMap.get(item.listId) ?? '' }));
 }

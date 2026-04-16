@@ -1,4 +1,6 @@
-import type { eventsTable } from '$lib/server/db/schema';
+import type { getEventsForMonthAllCalendars } from '$lib/server/db/queries';
+
+type EventRow = Awaited<ReturnType<typeof getEventsForMonthAllCalendars>>[number];
 
 export class CalendarEvent {
 	id: number;
@@ -6,14 +8,19 @@ export class CalendarEvent {
 	text: string;
 	calendar_slug: string;
 	calendar_id: number;
+	calendar_name: string;
+	calendar_colour: string | null;
 	created_by_name: string;
 	created_by_id: string;
-	constructor(e: typeof eventsTable.$inferSelect) {
+
+	constructor(e: EventRow) {
 		this.id = $state(e.id);
 		this.datetime = $state(e.datetime);
 		this.text = $state(e.text);
 		this.calendar_slug = $state(e.calendar_slug);
 		this.calendar_id = $state(e.calendar_id);
+		this.calendar_name = $state(e.calendar_name);
+		this.calendar_colour = $state(e.calendar_colour);
 		this.created_by_name = $state(e.created_by_name);
 		this.created_by_id = $state(e.created_by_id);
 	}

@@ -82,7 +82,10 @@ export const calendarsTable = sqliteTable('calendar', {
 	name: text('name').notNull().unique(),
 	slug: text('slug').notNull().unique(),
 	created_by_name: text('created_by_name').notNull(),
-	created_by_id: text('created_by_id').notNull()
+	created_by_id: text('created_by_id').notNull(),
+	// CSS variable suffix, e.g. "family-1" → var(--color-family-1)
+	// Auto-assigned on creation from the family palette.
+	colour: text('colour')
 });
 
 export const eventsTable = sqliteTable('event', {
