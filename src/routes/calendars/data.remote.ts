@@ -5,7 +5,6 @@ import {
 	createEvent,
 	deleteEvent,
 	getAllCalendars,
-	getCalendarBySlug,
 	getEventsForMonthAllCalendars,
 	overrideEventOccurrenceText,
 	updateEventText
@@ -20,10 +19,13 @@ export const getCalendars = query(async () => {
 	return getAllCalendars(locals.db);
 });
 
-export const loadEvents = query('unchecked', async ({ year, month }: { year: number; month: number }) => {
-	const { locals } = getRequestEvent();
-	return getEventsForMonthAllCalendars(locals.db, year, month);
-});
+export const loadEvents = query(
+	'unchecked',
+	async ({ year, month }: { year: number; month: number }) => {
+		const { locals } = getRequestEvent();
+		return getEventsForMonthAllCalendars(locals.db, year, month);
+	}
+);
 
 export const addEventToDate = command(
 	'unchecked',
@@ -77,19 +79,22 @@ export const addEventToDate = command(
 	}
 );
 
-export const editEvent = command('unchecked', async ({ id, text }: { id: number; text: string }) => {
-	const { locals } = getRequestEvent();
-	try {
-		await updateEventText(locals.db, id, text);
-		for (const arg of requested(loadEvents, 1)) {
-			void loadEvents(arg).refresh();
+export const editEvent = command(
+	'unchecked',
+	async ({ id, text }: { id: number; text: string }) => {
+		const { locals } = getRequestEvent();
+		try {
+			await updateEventText(locals.db, id, text);
+			for (const arg of requested(loadEvents, 1)) {
+				void loadEvents(arg).refresh();
+			}
+			return { success: true };
+		} catch (err) {
+			console.log(err);
+			return { success: false };
 		}
-		return { success: true };
-	} catch (err) {
-		console.log(err);
-		return { success: false };
 	}
-});
+);
 
 export const removeEvent = command('unchecked', async ({ id }: { id: number }) => {
 	const { locals } = getRequestEvent();
@@ -124,7 +129,15 @@ export const cancelOccurrence = command(
 
 export const overrideOccurrenceText = command(
 	'unchecked',
-	async ({ eventId, originalDatetime, text }: { eventId: number; originalDatetime: number; text: string }) => {
+	async ({
+		eventId,
+		originalDatetime,
+		text
+	}: {
+		eventId: number;
+		originalDatetime: number;
+		text: string;
+	}) => {
 		const { locals } = getRequestEvent();
 		try {
 			await overrideEventOccurrenceText(locals.db, eventId, originalDatetime, text);

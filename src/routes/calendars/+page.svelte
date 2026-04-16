@@ -1,15 +1,26 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Button from '$lib/components/Button.svelte';
 	import Textarea from '$lib/components/Textarea.svelte';
-	import { tick } from 'svelte';
-	import { addEventToDate, cancelOccurrence, editEvent, getCalendars, loadEvents, overrideOccurrenceText, removeEvent, createNewCalendar } from './data.remote';
+	import Toast from '$lib/components/toast/Toast.svelte';
+	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
 	import type { EventRecurrenceRule } from '$lib/server/db/schema';
+	import { tick } from 'svelte';
+	import { flip } from 'svelte/animate';
+	import { SvelteSet } from 'svelte/reactivity';
+	import {
+		addEventToDate,
+		cancelOccurrence,
+		createNewCalendar,
+		editEvent,
+		getCalendars,
+		loadEvents,
+		overrideOccurrenceText,
+		removeEvent
+	} from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 	import EventsList from './EventsList.svelte';
-	import { flip } from 'svelte/animate';
-	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
-	import Toast from '$lib/components/toast/Toast.svelte';
 
 	const toastService = getToastService();
 
@@ -23,16 +34,16 @@
 	let month = $derived(Number(page.url.searchParams.get('month') || todayM));
 
 	let isCurrentMonth = $derived(year === todayY && month === todayM);
-	let todayHref = `/calendars?year=${todayY}&month=${todayM}`;
+	let todayHref = resolve(`/calendars?year=${todayY}&month=${todayM}`);
 
 	let prevMonthHref = $derived.by(() => {
 		const d = new Date(year, month - 2);
-		return `/calendars?year=${d.getFullYear()}&month=${d.getMonth() + 1}`;
+		return resolve(`/calendars?year=${d.getFullYear()}&month=${d.getMonth() + 1}`);
 	});
 	let monthName = $derived(new Date(year, month - 1).toLocaleString('default', { month: 'long' }));
 	let nextMonthHref = $derived.by(() => {
 		const d = new Date(year, month);
-		return `/calendars?year=${d.getFullYear()}&month=${d.getMonth() + 1}`;
+		return resolve(`/calendars?year=${d.getFullYear()}&month=${d.getMonth() + 1}`);
 	});
 
 	let monthWeeks = $derived.by(() => {
@@ -47,25 +58,36 @@
 		let week: Date[] = [];
 		for (let d = first; d <= last; d.setDate(d.getDate() + 1)) {
 			week.push(new Date(d));
-			if (d.getDay() === 6) { weeks.push(week); week = []; }
+			if (d.getDay() === 6) {
+				weeks.push(week);
+				week = [];
+			}
 		}
 		return weeks;
 	});
 
 	function isToday(date: Date) {
-		return date.getFullYear() === todayY && date.getMonth() + 1 === todayM && date.getDate() === todayD;
+		return (
+			date.getFullYear() === todayY && date.getMonth() + 1 === todayM && date.getDate() === todayD
+		);
 	}
 
 	function isSameDay(datetime: number, date: Date) {
 		const e = new Date(datetime);
-		return e.getFullYear() === date.getFullYear() && e.getMonth() === date.getMonth() && e.getDate() === date.getDate();
+		return (
+			e.getFullYear() === date.getFullYear() &&
+			e.getMonth() === date.getMonth() &&
+			e.getDate() === date.getDate()
+		);
 	}
 
 	function isSelected(date: Date) {
-		return selectedDate !== null
-			&& date.getFullYear() === selectedDate.getFullYear()
-			&& date.getMonth() === selectedDate.getMonth()
-			&& date.getDate() === selectedDate.getDate();
+		return (
+			selectedDate !== null &&
+			date.getFullYear() === selectedDate.getFullYear() &&
+			date.getMonth() === selectedDate.getMonth() &&
+			date.getDate() === selectedDate.getDate()
+		);
 	}
 
 	// ---- Data ----
@@ -73,8 +95,9 @@
 	let hiddenCalendarIds = $state(new Set<number>());
 
 	function toggleCalendarFilter(id: number) {
-		const next = new Set(hiddenCalendarIds);
-		if (next.has(id)) next.delete(id); else next.add(id);
+		const next = new SvelteSet(hiddenCalendarIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
 		hiddenCalendarIds = next;
 	}
 
@@ -104,7 +127,9 @@
 
 	// ---- Dialog ----
 	let selectedDate = $state<Date | null>(null);
-	let selectedDateEvents = $derived(monthEvents.filter((e) => selectedDate && isSameDay(e.datetime, selectedDate)));
+	let selectedDateEvents = $derived(
+		monthEvents.filter((e) => selectedDate && isSameDay(e.datetime, selectedDate))
+	);
 
 	let selectedCalendarId = $derived(calendars[0]?.id ?? 0);
 	let newEventCalendarId = $state<number | null>(null);
@@ -115,7 +140,12 @@
 	let newEventEndsOn = $state('');
 	let showCreateCalendar = $state(false);
 	let newCalName = $state('');
-	let newCalSlug = $derived(newCalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+	let newCalSlug = $derived(
+		newCalName
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-|-$/g, '')
+	);
 
 	let dialog = $state<HTMLDialogElement>();
 
@@ -181,7 +211,11 @@
 		}
 		if (event.isRecurring && event.baseEventId != null && event.originalDatetime != null) {
 			// Override just this occurrence's text
-			await overrideOccurrenceText({ eventId: event.baseEventId, originalDatetime: event.originalDatetime, text }).updates(
+			await overrideOccurrenceText({
+				eventId: event.baseEventId,
+				originalDatetime: event.originalDatetime,
+				text
+			}).updates(
 				loadEvents({ year, month }).withOverride((events) =>
 					events.map((e) =>
 						e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime
@@ -192,7 +226,9 @@
 			);
 		} else {
 			await editEvent({ id: event.id, text }).updates(
-				loadEvents({ year, month }).withOverride((events) => events.map((e) => (e.id === event.id ? { ...e, text } : e)))
+				loadEvents({ year, month }).withOverride((events) =>
+					events.map((e) => (e.id === event.id ? { ...e, text } : e))
+				)
 			);
 		}
 	}
@@ -205,10 +241,14 @@
 
 	async function cancelThisOccurrence(event: (typeof allMonthEvents)[number]) {
 		if (event.baseEventId == null || event.originalDatetime == null) return;
-		await cancelOccurrence({ eventId: event.baseEventId, originalDatetime: event.originalDatetime }).updates(
+		await cancelOccurrence({
+			eventId: event.baseEventId,
+			originalDatetime: event.originalDatetime
+		}).updates(
 			loadEvents({ year, month }).withOverride((events) =>
 				events.filter(
-					(e) => !(e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime)
+					(e) =>
+						!(e.baseEventId === event.baseEventId && e.originalDatetime === event.originalDatetime)
 				)
 			)
 		);
@@ -216,7 +256,6 @@
 </script>
 
 <div class="calendar-wrapper">
-
 	<!-- Filter chips -->
 	<section class="filter-bar">
 		{#each calendars as cal (cal.id)}
@@ -231,14 +270,25 @@
 				{cal.name}
 			</button>
 		{/each}
-		<button type="button" class="add-cal-btn" onclick={() => (showCreateCalendar = !showCreateCalendar)} aria-label="Add calendar">+</button>
+		<button
+			type="button"
+			class="add-cal-btn"
+			onclick={() => (showCreateCalendar = !showCreateCalendar)}
+			aria-label="Add calendar">+</button
+		>
 	</section>
 
 	{#if showCreateCalendar}
 		<section class="create-calendar">
 			<form {...createNewCalendar}>
 				<input type="hidden" name="slug" value={newCalSlug} />
-				<input name="name" type="text" placeholder="Calendar name" bind:value={newCalName} required />
+				<input
+					name="name"
+					type="text"
+					placeholder="Calendar name"
+					bind:value={newCalName}
+					required
+				/>
 				<Button type="submit">Create</Button>
 				<Button onclick={() => (showCreateCalendar = false)}>Cancel</Button>
 			</form>
@@ -249,7 +299,9 @@
 	{#if calendars.length === 0 && !showCreateCalendar}
 		<div class="no-calendars">
 			<p>No calendars yet.</p>
-			<button type="button" onclick={() => (showCreateCalendar = true)}>Create your first calendar →</button>
+			<button type="button" onclick={() => (showCreateCalendar = true)}
+				>Create your first calendar →</button
+			>
 		</div>
 	{/if}
 
@@ -258,7 +310,7 @@
 		<table>
 			<thead>
 				<tr>
-					{#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as d}
+					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d (d)}
 						<th>{d}</th>
 					{/each}
 				</tr>
@@ -268,7 +320,12 @@
 					<tr style:flex="1 1 {Math.floor(100 / monthWeeks.length)}%">
 						{#each week as date (date.getTime())}
 							{@const events = monthEvents.filter((e) => isSameDay(e.datetime, date))}
-							<td class:day={true} class:differentMonth={date.getMonth() + 1 !== month} class:today={isToday(date)} class:selected={isSelected(date)}>
+							<td
+								class:day={true}
+								class:differentMonth={date.getMonth() + 1 !== month}
+								class:today={isToday(date)}
+								class:selected={isSelected(date)}
+							>
 								<div class="date-content">
 									<div class="date-label">
 										<span class="date-num">{date.getDate()}</span>
@@ -301,9 +358,14 @@
 	{#if upcomingEvents.length > 0}
 		<section class="upcoming">
 			{#each upcomingEvents as event (event.isRecurring ? `${event.baseEventId}:${event.originalDatetime}` : event.id)}
-				<button type="button" class="upcoming-row" onclick={() => handleDateClick(new Date(event.datetime))}>
+				<button
+					type="button"
+					class="upcoming-row"
+					onclick={() => handleDateClick(new Date(event.datetime))}
+				>
 					{#if event.calendar_colour}
-						<span class="upcoming-dot" style="background: var(--color-{event.calendar_colour})"></span>
+						<span class="upcoming-dot" style="background: var(--color-{event.calendar_colour})"
+						></span>
 					{/if}
 					<span class="upcoming-date">{formatUpcomingDate(event.datetime)}</span>
 					<span class="upcoming-text">{event.text}</span>
@@ -311,7 +373,6 @@
 			{/each}
 		</section>
 	{/if}
-
 </div>
 
 <!-- Day dialog -->
@@ -323,8 +384,17 @@
 			<h2 class="dialog-date">{formatDialogDate(selectedDate)}</h2>
 		{/if}
 		<button class="dialog-close" onclick={hideDialog} aria-label="Close">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
 			</svg>
 		</button>
 	</div>
@@ -337,16 +407,30 @@
 						<div class="event-input">
 							<div class="event-meta">
 								{#if event.calendar_colour}
-									<span class="event-cal-badge" style="background: var(--color-{event.calendar_colour})">{event.calendar_name}</span>
+									<span
+										class="event-cal-badge"
+										style="background: var(--color-{event.calendar_colour})"
+										>{event.calendar_name}</span
+									>
 								{/if}
 								{#if event.isRecurring}
-									<span class="recurrence-badge" title="Recurring event">↻ {event.recurrenceRule}</span>
+									<span class="recurrence-badge" title="Recurring event"
+										>↻ {event.recurrenceRule}</span
+									>
 								{/if}
 							</div>
-							<Textarea bind:value={event.text} onchange={() => editEventText(event, event.text || '')} style="width: 100%"></Textarea>
+							<Textarea
+								bind:value={event.text}
+								onchange={() => editEventText(event, event.text || '')}
+								style="width: 100%"
+							></Textarea>
 							{#if event.isRecurring}
 								<div class="event-actions">
-									<button type="button" class="action-link danger" onclick={() => cancelThisOccurrence(event)}>
+									<button
+										type="button"
+										class="action-link danger"
+										onclick={() => cancelThisOccurrence(event)}
+									>
 										Cancel this date
 									</button>
 									<button type="button" class="action-link" onclick={() => deleteEvent(event)}>
@@ -367,14 +451,37 @@
 		{#if calendars.length > 1}
 			<div class="cal-picker">
 				{#each calendars as cal (cal.id)}
-					<button type="button" class="cal-pick-btn" class:active={effectiveCalendarId === cal.id} onclick={() => (newEventCalendarId = cal.id)} style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})">
+					<button
+						type="button"
+						class="cal-pick-btn"
+						class:active={effectiveCalendarId === cal.id}
+						onclick={() => (newEventCalendarId = cal.id)}
+						style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})"
+					>
 						<span class="chip-dot"></span>{cal.name}
 					</button>
 				{/each}
 			</div>
 		{/if}
-		<form onsubmit={(e) => { e.preventDefault(); if (selectedDate) createEvent(selectedDate, editingText); editingText = ''; }}>
-			<Textarea bind:value={editingText} placeholder="Add event…" style="width: 100%" onkeydown={(e) => { if (e.key === 'Enter' && e.metaKey) { e.preventDefault(); if (selectedDate) createEvent(selectedDate, editingText); editingText = ''; } }}></Textarea>
+		<form
+			onsubmit={(e) => {
+				e.preventDefault();
+				if (selectedDate) createEvent(selectedDate, editingText);
+				editingText = '';
+			}}
+		>
+			<Textarea
+				bind:value={editingText}
+				placeholder="Add event…"
+				style="width: 100%"
+				onkeydown={(e) => {
+					if (e.key === 'Enter' && e.metaKey) {
+						e.preventDefault();
+						if (selectedDate) createEvent(selectedDate, editingText);
+						editingText = '';
+					}
+				}}
+			></Textarea>
 			<div class="repeat-row">
 				<label class="repeat-label" for="repeat-select">Repeat</label>
 				<select id="repeat-select" class="repeat-select" bind:value={newEventRepeat}>
@@ -387,7 +494,13 @@
 				</select>
 				{#if newEventRepeat}
 					<label class="repeat-label" for="ends-on-input">Ends</label>
-					<input id="ends-on-input" type="date" class="ends-on-input" bind:value={newEventEndsOn} placeholder="No end" />
+					<input
+						id="ends-on-input"
+						type="date"
+						class="ends-on-input"
+						bind:value={newEventEndsOn}
+						placeholder="No end"
+					/>
 				{/if}
 			</div>
 			<div class="actions">
@@ -437,7 +550,9 @@
 			flex: none;
 		}
 
-		&.dimmed { opacity: 0.35; }
+		&.dimmed {
+			opacity: 0.35;
+		}
 	}
 
 	.no-calendars {
@@ -476,7 +591,10 @@
 		align-items: center;
 		justify-content: center;
 		line-height: 1;
-		&:hover { color: var(--color-text); border-color: var(--color-border-strong); }
+		&:hover {
+			color: var(--color-text);
+			border-color: var(--color-border-strong);
+		}
 	}
 
 	/* ---- Create calendar ---- */
@@ -500,7 +618,9 @@
 				background: var(--color-surface);
 				color: var(--color-text);
 				outline: none;
-				&:focus { border-color: var(--color-accent); }
+				&:focus {
+					border-color: var(--color-accent);
+				}
 			}
 		}
 	}
@@ -550,7 +670,9 @@
 				border-top: 1px solid var(--color-border);
 				overflow: hidden;
 
-				&:last-child { border-bottom: 1px solid var(--color-border); }
+				&:last-child {
+					border-bottom: 1px solid var(--color-border);
+				}
 
 				td.day {
 					flex: 1 1 14%;
@@ -559,7 +681,9 @@
 					border-left: 1px solid var(--color-border);
 					padding: 0;
 
-					&:last-child { border-right: 1px solid var(--color-border); }
+					&:last-child {
+						border-right: 1px solid var(--color-border);
+					}
 
 					&.selected {
 						background: color-mix(in srgb, var(--color-accent) 10%, transparent);
@@ -610,13 +734,19 @@
 							flex-direction: column;
 							justify-content: flex-start;
 
-							&:hover { background-color: color-mix(in srgb, var(--color-text) 8%, transparent); }
+							&:hover {
+								background-color: color-mix(in srgb, var(--color-text) 8%, transparent);
+							}
 						}
 					}
 
 					&.differentMonth {
-						div.date-label .date-num { color: var(--color-text-subtle); }
-						button { background-color: color-mix(in srgb, var(--color-text) 4%, transparent); }
+						div.date-label .date-num {
+							color: var(--color-text-subtle);
+						}
+						button {
+							background-color: color-mix(in srgb, var(--color-text) 4%, transparent);
+						}
 					}
 
 					/* Today: accent circle around the date number */
@@ -658,15 +788,17 @@
 		font-family: var(--font-body);
 		color: var(--color-accent);
 		text-decoration: none;
-		&:hover { text-decoration: underline; }
+		&:hover {
+			text-decoration: underline;
+		}
 	}
 
 	/* ---- Upcoming strip ---- */
 	.upcoming {
+		display: none;
 		flex: none;
 		border-top: 1px solid var(--color-border-subtle);
 		padding: var(--space-2) var(--space-4) var(--space-4);
-		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		max-height: 140px;
@@ -686,7 +818,9 @@
 		width: 100%;
 		transition: background var(--duration-fast) var(--ease-standard);
 
-		&:hover { background: var(--color-surface-sunken); }
+		&:hover {
+			background: var(--color-surface-sunken);
+		}
 	}
 
 	.upcoming-dot {
@@ -751,9 +885,14 @@
 		border-radius: var(--radius-sm);
 		transition: color var(--duration-fast) var(--ease-standard);
 
-		&:hover { color: var(--color-text); }
+		&:hover {
+			color: var(--color-text);
+		}
 
-		svg { width: var(--size-icon-sm); height: var(--size-icon-sm); }
+		svg {
+			width: var(--size-icon-sm);
+			height: var(--size-icon-sm);
+		}
 	}
 
 	.events {
@@ -822,8 +961,12 @@
 		text-decoration: underline;
 		text-underline-offset: 2px;
 
-		&:hover { color: var(--color-text); }
-		&.danger:hover { color: var(--color-danger); }
+		&:hover {
+			color: var(--color-text);
+		}
+		&.danger:hover {
+			color: var(--color-danger);
+		}
 	}
 
 	.cal-picker {
@@ -855,7 +998,10 @@
 			flex: none;
 		}
 
-		&.active { background: var(--chip-color, var(--color-border)); color: var(--color-text-inverse); }
+		&.active {
+			background: var(--chip-color, var(--color-border));
+			color: var(--color-text-inverse);
+		}
 	}
 
 	.new-event {
@@ -894,6 +1040,8 @@
 		padding: 2px var(--space-2);
 		outline: none;
 
-		&:focus { border-color: var(--color-accent); }
+		&:focus {
+			border-color: var(--color-accent);
+		}
 	}
 </style>
