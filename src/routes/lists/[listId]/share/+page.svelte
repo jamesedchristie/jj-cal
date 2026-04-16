@@ -3,6 +3,9 @@
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import { addShare, getList, getShareableUsers, getShares, removeShare, updateShare } from './data.remote';
 	import type { Permission } from '$lib/server/db/schema';
+	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+
+	const toastService = getToastService();
 
 	const list = $derived(await getList());
 	const shares = $derived(await getShares());
@@ -64,7 +67,7 @@
 							<form {...toggle}>
 								<input {...toggle.fields.share_id.as('hidden', share.shareId)} />
 								<select
-									name={toggle.fields.permission.name}
+									name="permission"
 									onchange={(e) => {
 										(e.currentTarget.closest('form') as HTMLFormElement).requestSubmit();
 									}}
@@ -102,10 +105,14 @@
 
 			<form
 				{...addShare.enhance(async ({ form, submit }) => {
-					await submit();
-					form.reset();
-					selectedUserId = null;
-					selectedPermission = 'editor';
+					const ok = await submit();
+					if (ok) {
+						form.reset();
+						selectedUserId = null;
+						selectedPermission = 'editor';
+					} else {
+						toastService().show(new ToastMessage('Failed to add person', { type: 'error' }));
+					}
 				})}
 				class="add-form"
 			>
@@ -114,7 +121,7 @@
 						<label class="user-option" class:selected={selectedUserId === u.id}>
 							<input
 								type="radio"
-								name={addShare.fields.user_id.name}
+								name="user_id"
 								value={u.id}
 								checked={selectedUserId === u.id}
 								onchange={() => (selectedUserId = u.id)}
@@ -130,7 +137,7 @@
 					<label class="perm-option" class:selected={selectedPermission === 'editor'}>
 						<input
 							type="radio"
-							name={addShare.fields.permission.name}
+							name="permission"
 							value="editor"
 							checked={selectedPermission === 'editor'}
 							onchange={() => (selectedPermission = 'editor')}
@@ -142,7 +149,7 @@
 					<label class="perm-option" class:selected={selectedPermission === 'viewer'}>
 						<input
 							type="radio"
-							name={addShare.fields.permission.name}
+							name="permission"
 							value="viewer"
 							checked={selectedPermission === 'viewer'}
 							onchange={() => (selectedPermission = 'viewer')}

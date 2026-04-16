@@ -1,17 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
-	import { fly, fade } from 'svelte/transition';
-	import { addItemToPrimaryList } from '../../routes/tasks/data.remote';
+	import { fade, fly } from 'svelte/transition';
 	import { quickAddEventToday } from '../../routes/calendars/data.remote';
 	import { addItem } from '../../routes/lists/[listId]/data.remote';
+	import { addItemToPrimaryList } from '../../routes/tasks/data.remote';
+	import { getToastService, ToastMessage } from './toast/toastService.svelte';
+
+	const toastService = getToastService();
 
 	type Section = 'tasks' | 'calendar' | 'list-detail' | null;
 
 	const section = $derived.by((): Section => {
 		const path = page.url.pathname;
 		if (path.startsWith('/tasks')) return 'tasks';
-		if (path.startsWith('/calendars')) return 'calendar';
+		// if (path.startsWith('/calendars')) return 'calendar';
 		// /lists/[id] only — not the hub (/lists) or share sub-page (/lists/[id]/share)
 		if (/^\/lists\/[^/]+$/.test(path)) return 'list-detail';
 		return null;
@@ -19,13 +22,19 @@
 
 	// Available for list-detail section — pulled from the route's params
 	const listId = $derived(page.params.listId ?? '');
+	// Use .for() to get a separate instance from the one on the list detail page
+	const fabAddItem = $derived(addItem.for(listId));
 
 	const sheetConfig = $derived.by(() => {
 		switch (section) {
-			case 'tasks':    return { label: 'New task',        placeholder: 'What needs to be done?' };
-			case 'calendar': return { label: 'Event for today', placeholder: "What's happening today?" };
-			case 'list-detail': return { label: 'Add item',     placeholder: 'Add…' };
-			default:         return { label: '', placeholder: '' };
+			case 'tasks':
+				return { label: 'New task', placeholder: 'What needs to be done?' };
+			case 'calendar':
+				return { label: 'Event for today', placeholder: "What's happening today?" };
+			case 'list-detail':
+				return { label: 'Add item', placeholder: 'Add…' };
+			default:
+				return { label: '', placeholder: '' };
 		}
 	});
 
@@ -50,15 +59,23 @@
 		aria-label={sheetConfig.label}
 		transition:fade={{ duration: 150 }}
 	>
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-			<line x1="12" y1="5" x2="12" y2="19"/>
-			<line x1="5" y1="12" x2="19" y2="12"/>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.5"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+		>
+			<line x1="12" y1="5" x2="12" y2="19" />
+			<line x1="5" y1="12" x2="19" y2="12" />
 		</svg>
 	</button>
 {/if}
 
 {#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class="backdrop"
 		onclick={closeSheet}
@@ -73,9 +90,13 @@
 		{#if section === 'tasks'}
 			<form
 				{...addItemToPrimaryList.enhance(async ({ form, submit }) => {
-					await submit();
-					form.reset();
-					closeSheet();
+					const ok = await submit();
+					if (ok) {
+						form.reset();
+						closeSheet();
+					} else {
+						toastService().show(new ToastMessage('Failed to add task', { type: 'error' }));
+					}
 				})}
 				class="sheet-form"
 			>
@@ -88,7 +109,6 @@
 				/>
 				<button type="submit" class="sheet-submit">Add task</button>
 			</form>
-
 		{:else if section === 'calendar'}
 			<form
 				onsubmit={async (e) => {
@@ -113,23 +133,23 @@
 				/>
 				<button type="submit" class="sheet-submit">Add event</button>
 			</form>
-
 		{:else if section === 'list-detail'}
 			<form
-				{...addItem.enhance(async ({ form, submit }) => {
-					await submit();
-					form.reset();
-					closeSheet();
+				{...fabAddItem.enhance(async ({ form, submit }) => {
+					const ok = await submit();
+					if (ok) {
+						form.reset();
+						closeSheet();
+					} else {
+						toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+					}
 				})}
 				class="sheet-form"
 			>
-				<input {...addItem.fields.list_id.as('hidden', listId)} />
-				<input {...addItem.fields.due_date.as('hidden', '')} />
-				<input {...addItem.fields.assigned_to_id.as('hidden', '')} />
-				<input {...addItem.fields.recurrence_interval.as('hidden', '')} />
+				<input {...fabAddItem.fields.list_id.as('hidden', listId)} />
 				<input
 					bind:this={inputEl}
-					{...addItem.fields.text.as('text')}
+					{...fabAddItem.fields.text.as('text')}
 					placeholder={sheetConfig.placeholder}
 					autocomplete="off"
 					class="sheet-input"
@@ -157,7 +177,8 @@
 		justify-content: center;
 		box-shadow: var(--shadow-fab);
 		z-index: var(--z-fab);
-		transition: transform var(--duration-fast) var(--ease-standard),
+		transition:
+			transform var(--duration-fast) var(--ease-standard),
 			box-shadow var(--duration-fast) var(--ease-standard);
 
 		svg {
@@ -225,7 +246,8 @@
 		outline: none;
 		background: var(--color-surface-sunken);
 		box-sizing: border-box;
-		transition: border-color var(--duration-fast) var(--ease-standard),
+		transition:
+			border-color var(--duration-fast) var(--ease-standard),
 			background var(--duration-fast) var(--ease-standard);
 
 		&:focus {

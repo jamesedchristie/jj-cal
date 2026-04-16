@@ -2,6 +2,9 @@
 	import { resolve } from '$app/paths';
 	import { getLists, newList } from './data.remote';
 	import type { ListType } from '$lib/server/db/schema';
+	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+
+	const toastService = getToastService();
 
 	const lists = $derived(await getLists());
 	const taskLists = $derived(lists.filter((l) => l.type === 'todo'));
@@ -48,10 +51,14 @@
 	{#if showForm}
 		<form
 			{...newList.enhance(async ({ form, submit }) => {
-				await submit();
-				form.reset();
-				showForm = false;
-				selectedType = 'shopping';
+				const ok = await submit();
+				if (ok) {
+					form.reset();
+					showForm = false;
+					selectedType = 'shopping';
+				} else {
+					toastService().show(new ToastMessage('Failed to create list', { type: 'error' }));
+				}
 			})}
 			class="new-form"
 		>
@@ -66,7 +73,7 @@
 					<label class="type-option" class:selected={selectedType === type}>
 						<input
 							type="radio"
-							name={newList.fields.type.name}
+							name="type"
 							value={type}
 							checked={selectedType === type}
 							onchange={() => (selectedType = type as ListType)}
