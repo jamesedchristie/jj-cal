@@ -26,7 +26,7 @@
 </script>
 
 <section>
-	<h2>Welcome to Family Hub</h2>
+	<h2>Welcome to JJ Cal</h2>
 
 	<form onsubmit={handleLogin}>
 		<label>

@@ -106,11 +106,11 @@
 </div>
 
 {#if qrToken}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div class="overlay" onclick={closeQr}>
 		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 		<div class="qr-card" onclick={(e) => e.stopPropagation()}>
-			<p class="qr-hint">Scan to join the family hub</p>
+			<p class="qr-hint">Scan to join JJ Cal</p>
 			<canvas bind:this={qrCanvas}></canvas>
 			<p class="qr-url">{inviteUrl(qrToken)}</p>
 			<div class="qr-actions">

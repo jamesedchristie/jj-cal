@@ -1,5 +1,5 @@
-import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -8,8 +8,8 @@ export default defineConfig({
 		SvelteKitPWA({
 			registerType: 'autoUpdate',
 			manifest: {
-				name: 'Family Hub',
-				short_name: 'Family Hub',
+				name: 'JJ Cal',
+				short_name: 'JJ Cal',
 				description: 'Shared family planner — calendar, tasks, and lists',
 				theme_color: '#3b82f6',
 				background_color: '#ffffff',

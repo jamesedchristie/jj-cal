@@ -1,4 +1,4 @@
-# Family Hub — Product Vision
+# JJ Cal — Product Vision
 
 ## What is this?
 
@@ -19,6 +19,7 @@ A shared family planning and admin app for couples and households. Started as a 
 ## Feature areas
 
 ### 1. Calendar (existing, enhance)
+
 - Shared family calendar
 - Personal calendars overlaid
 - Recurring events
@@ -26,6 +27,7 @@ A shared family planning and admin app for couples and households. Started as a 
 - Event categories/tags
 
 ### 2. Todos & Tasks
+
 - Shared and personal todo lists
 - Assign tasks to family members
 - Due dates, priorities
@@ -33,34 +35,40 @@ A shared family planning and admin app for couples and households. Started as a 
 - Mark complete with satisfying UX
 
 ### 3. Reminders & Notifications
+
 - Set reminders tied to calendar events or standalone
 - Push notifications via PWA service worker
 - Snooze / dismiss
 
 ### 4. Generic Lists
+
 - Shopping lists (real-time collaborative)
 - Packing lists (reusable templates)
 - Custom named lists (e.g. "Movies to watch", "Restaurants to try")
 - Check-off items, reorder, archive
 
 ### 5. Meal Planning
+
 - Weekly dinner planner
 - Link meals to shopping list auto-population
 - Saved meal ideas / rotation
 
 ### 6. Simple Budgeting
+
 - Monthly budget categories (groceries, eating out, entertainment, etc.)
 - Log expenses against categories
 - Running totals and simple over/under view
 - No bank integrations — manual entry, kept simple
 
 ### 7. Family Profiles & Multi-user
+
 - Each family member has a profile with a color, used throughout the app for identification and assignment
 - Profiles are always backed by a real user account — no "ghost" profiles for non-logged-in members
 - Invite system via shareable link or QR code (no email sending — invites are shared out-of-band via WhatsApp/iMessage/in person)
 - Single admin-style elevated role for user management (inviting, removing users, resetting passwords). Per-resource permissions (viewer/editor) are orthogonal and apply to anything shared with you
 
 ### 8. Quick Reference / Info
+
 - Emergency contacts
 - Important numbers (doctor, vet, school, plumber etc.)
 - Household info (WiFi password, bin day, etc.)

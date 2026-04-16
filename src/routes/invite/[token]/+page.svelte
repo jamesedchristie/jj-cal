@@ -5,12 +5,6 @@
 	import TextInput from '$lib/components/TextInput.svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 
-	interface Props {
-		data: { token: string };
-	}
-
-	let { data }: Props = $props();
-
 	const COLOURS = [
 		{ id: 'family-1', label: 'Red' },
 		{ id: 'family-2', label: 'Orange' },
@@ -50,7 +44,7 @@
 			});
 
 			if (!res.ok) {
-				const body = await res.json().catch(() => ({ message: '' })) as { message?: string };
+				const body = (await res.json().catch(() => ({ message: '' }))) as { message?: string };
 				error = body.message ?? 'Sign-up failed. Please try again.';
 				return;
 			}
@@ -65,7 +59,7 @@
 </script>
 
 <div class="page">
-	<h1>Join the family hub</h1>
+	<h1>Join JJ Cal</h1>
 	<p class="subtitle">You've been invited! Create your account to get started.</p>
 
 	<div class="avatar-preview">

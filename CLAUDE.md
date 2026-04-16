@@ -2,21 +2,21 @@
 
 ## Project
 
-**Family Hub** — a shared family planning and admin PWA. See `VISION.md` for full product vision.
+**JJ Cal** — a shared family planning and admin PWA. See `VISION.md` for full product vision.
 
 Started as a shared calendar (jj-cal) and evolving into a full family hub.
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Framework | SvelteKit 5 (Svelte 5 runes) |
-| Runtime | Cloudflare Workers |
-| Database | Turso (libSQL) via Drizzle ORM |
-| Dates | Temporal API |
-| Styles | Plain CSS in Svelte `<style>` blocks, driven by design tokens in `src/styles/tokens.css` |
-| Package manager | pnpm |
-| Deployment | Cloudflare Pages |
+| Layer           | Technology                                                                               |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Framework       | SvelteKit 5 (Svelte 5 runes)                                                             |
+| Runtime         | Cloudflare Workers                                                                       |
+| Database        | Turso (libSQL) via Drizzle ORM                                                           |
+| Dates           | Temporal API                                                                             |
+| Styles          | Plain CSS in Svelte `<style>` blocks, driven by design tokens in `src/styles/tokens.css` |
+| Package manager | pnpm                                                                                     |
+| Deployment      | Cloudflare Pages                                                                         |
 
 ## Key conventions
 
@@ -41,23 +41,23 @@ All UI styling MUST use the CSS custom properties defined in `src/styles/tokens.
 
 ### Required
 
-| Property | Token |
-|---|---|
-| Colours | `var(--color-*)` |
-| Spacing (padding, margin, gap) | `var(--space-*)` |
-| Font family | `var(--font-body)`, `var(--font-heading)`, `var(--font-mono)` |
-| Font size | `var(--font-size-*)` |
-| Font weight | `var(--font-weight-*)` |
-| Line height | `var(--line-height-*)` |
-| Letter spacing | `var(--letter-spacing-*)` |
-| Border radius | `var(--radius-*)` |
-| Shadow | `var(--shadow-*)` |
-| Transition duration | `var(--duration-*)` |
-| Transition easing | `var(--ease-*)` |
-| Z-index | `var(--z-*)` |
-| Safe area insets | `var(--safe-top/bottom/left/right)` |
-| Max content width | `var(--layout-max-width)` |
-| Page gutter | `var(--layout-gutter)` |
+| Property                       | Token                                                         |
+| ------------------------------ | ------------------------------------------------------------- |
+| Colours                        | `var(--color-*)`                                              |
+| Spacing (padding, margin, gap) | `var(--space-*)`                                              |
+| Font family                    | `var(--font-body)`, `var(--font-heading)`, `var(--font-mono)` |
+| Font size                      | `var(--font-size-*)`                                          |
+| Font weight                    | `var(--font-weight-*)`                                        |
+| Line height                    | `var(--line-height-*)`                                        |
+| Letter spacing                 | `var(--letter-spacing-*)`                                     |
+| Border radius                  | `var(--radius-*)`                                             |
+| Shadow                         | `var(--shadow-*)`                                             |
+| Transition duration            | `var(--duration-*)`                                           |
+| Transition easing              | `var(--ease-*)`                                               |
+| Z-index                        | `var(--z-*)`                                                  |
+| Safe area insets               | `var(--safe-top/bottom/left/right)`                           |
+| Max content width              | `var(--layout-max-width)`                                     |
+| Page gutter                    | `var(--layout-gutter)`                                        |
 
 ### Allowed raw values (exceptions)
 

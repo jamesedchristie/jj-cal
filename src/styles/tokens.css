@@ -1,5 +1,5 @@
 /*
- * Design tokens for Family Hub.
+ * Design tokens for JJ Cal.
  *
  * All UI styling MUST use these tokens. No raw values in component styles.
  * If you need a value that doesn't have a token, add it here in the right
@@ -62,14 +62,14 @@
 	/* Used for avatars, event tints, assignee chips, etc.                 */
 	/* Text on these is always var(--color-text-inverse).                  */
 	/* ------------------------------------------------------------------ */
-	--color-family-1: #ef4444;  /* red    */
-	--color-family-2: #f97316;  /* orange */
-	--color-family-3: #eab308;  /* amber  */
-	--color-family-4: #22c55e;  /* green  */
-	--color-family-5: #14b8a6;  /* teal   */
-	--color-family-6: #3b82f6;  /* blue   */
-	--color-family-7: #a855f7;  /* violet */
-	--color-family-8: #ec4899;  /* pink   */
+	--color-family-1: #ef4444; /* red    */
+	--color-family-2: #f97316; /* orange */
+	--color-family-3: #eab308; /* amber  */
+	--color-family-4: #22c55e; /* green  */
+	--color-family-5: #14b8a6; /* teal   */
+	--color-family-6: #3b82f6; /* blue   */
+	--color-family-7: #a855f7; /* violet */
+	--color-family-8: #ec4899; /* pink   */
 
 	/* ------------------------------------------------------------------ */
 	/* Typography                                                          */
@@ -169,12 +169,12 @@
 	/* ------------------------------------------------------------------ */
 	/* Component sizes                                                     */
 	/* ------------------------------------------------------------------ */
-	--size-icon-sm: 1.125rem;   /* 18px — small inline icons               */
-	--size-icon-md: 1.375rem;   /* 22px — nav icons                        */
-	--size-icon-lg: 1.5rem;     /* 24px — FAB icon, large buttons          */
-	--size-fab: 3.5rem;         /* 56px — floating action button           */
+	--size-icon-sm: 1.125rem; /* 18px — small inline icons               */
+	--size-icon-md: 1.375rem; /* 22px — nav icons                        */
+	--size-icon-lg: 1.5rem; /* 24px — FAB icon, large buttons          */
+	--size-fab: 3.5rem; /* 56px — floating action button           */
 	--size-handle-width: 2.25rem; /* 36px — bottom-sheet drag handle       */
-	--nav-height: 4.5rem;       /* ~72px — bottom nav bar, used for FAB offset */
+	--nav-height: 4.5rem; /* ~72px — bottom nav bar, used for FAB offset */
 
 	/* ------------------------------------------------------------------ */
 	/* Layout                                                              */

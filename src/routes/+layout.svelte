@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { pwaInfo } from 'virtual:pwa-info';
 	import { resolve } from '$app/paths';
 	import favicon from '$lib/assets/favicon.svg';
-	import Button from '$lib/components/Button.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import FAB from '$lib/components/FAB.svelte';
+	import Toast from '$lib/components/toast/Toast.svelte';
+	import { setToastService, ToastService } from '$lib/components/toast/toastService.svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
+	import { pwaInfo } from 'virtual:pwa-info';
 	import '../app.css';
 	import type { LayoutData } from './$types';
-	import { setToastService, ToastService } from '$lib/components/toast/toastService.svelte';
-	import Toast from '$lib/components/toast/Toast.svelte';
 
 	interface Props {
 		data: LayoutData;
@@ -35,6 +35,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html webManifestLink}
 </svelte:head>
 
@@ -43,7 +44,7 @@
 <div class="layout-wrapper">
 	<header>
 		<a href={resolve('/calendars')}>
-			<h1>Family Hub</h1>
+			<h1>JJ Cal</h1>
 		</a>
 		<div class="header-right">
 			{#if data.user}
