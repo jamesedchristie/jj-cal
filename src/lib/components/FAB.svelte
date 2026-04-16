@@ -3,10 +3,31 @@
 	import { tick } from 'svelte';
 	import { fly, fade } from 'svelte/transition';
 	import { addItemToPrimaryList } from '../../routes/tasks/data.remote';
+	import { quickAddEventToday } from '../../routes/calendars/data.remote';
+	import { addItem } from '../../routes/lists/[listId]/data.remote';
 
-	const section = $derived(
-		page.url.pathname.startsWith('/tasks') ? 'tasks' : null
-	);
+	type Section = 'tasks' | 'calendar' | 'list-detail' | null;
+
+	const section = $derived.by((): Section => {
+		const path = page.url.pathname;
+		if (path.startsWith('/tasks')) return 'tasks';
+		if (path.startsWith('/calendars')) return 'calendar';
+		// /lists/[id] only — not the hub (/lists) or share sub-page (/lists/[id]/share)
+		if (/^\/lists\/[^/]+$/.test(path)) return 'list-detail';
+		return null;
+	});
+
+	// Available for list-detail section — pulled from the route's params
+	const listId = $derived(page.params.listId ?? '');
+
+	const sheetConfig = $derived.by(() => {
+		switch (section) {
+			case 'tasks':    return { label: 'New task',        placeholder: 'What needs to be done?' };
+			case 'calendar': return { label: 'Event for today', placeholder: "What's happening today?" };
+			case 'list-detail': return { label: 'Add item',     placeholder: 'Add…' };
+			default:         return { label: '', placeholder: '' };
+		}
+	});
 
 	let open = $state(false);
 	let inputEl = $state<HTMLInputElement | undefined>();
@@ -26,7 +47,7 @@
 	<button
 		class="fab"
 		onclick={openSheet}
-		aria-label={section === 'tasks' ? 'Add task' : 'Add'}
+		aria-label={sheetConfig.label}
 		transition:fade={{ duration: 150 }}
 	>
 		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -47,9 +68,9 @@
 
 	<div class="sheet" transition:fly={{ y: 240, duration: 280, opacity: 1 }}>
 		<div class="handle"></div>
+		<p class="sheet-label">{sheetConfig.label}</p>
 
 		{#if section === 'tasks'}
-			<p class="sheet-label">New task</p>
 			<form
 				{...addItemToPrimaryList.enhance(async ({ form, submit }) => {
 					await submit();
@@ -61,11 +82,59 @@
 				<input
 					bind:this={inputEl}
 					{...addItemToPrimaryList.fields.text.as('text')}
-					placeholder="What needs to be done?"
+					placeholder={sheetConfig.placeholder}
 					autocomplete="off"
 					class="sheet-input"
 				/>
 				<button type="submit" class="sheet-submit">Add task</button>
+			</form>
+
+		{:else if section === 'calendar'}
+			<form
+				onsubmit={async (e) => {
+					e.preventDefault();
+					const data = new FormData(e.currentTarget as HTMLFormElement);
+					const text = (data.get('text') as string | null)?.trim() ?? '';
+					if (!text) return;
+					await quickAddEventToday({ text });
+					(e.currentTarget as HTMLFormElement).reset();
+					closeSheet();
+				}}
+				class="sheet-form"
+			>
+				<input
+					bind:this={inputEl}
+					name="text"
+					type="text"
+					placeholder={sheetConfig.placeholder}
+					autocomplete="off"
+					class="sheet-input"
+					required
+				/>
+				<button type="submit" class="sheet-submit">Add event</button>
+			</form>
+
+		{:else if section === 'list-detail'}
+			<form
+				{...addItem.enhance(async ({ form, submit }) => {
+					await submit();
+					form.reset();
+					closeSheet();
+				})}
+				class="sheet-form"
+			>
+				<input {...addItem.fields.list_id.as('hidden', listId)} />
+				<input {...addItem.fields.due_date.as('hidden', '')} />
+				<input {...addItem.fields.assigned_to_id.as('hidden', '')} />
+				<input {...addItem.fields.recurrence_interval.as('hidden', '')} />
+				<input
+					bind:this={inputEl}
+					{...addItem.fields.text.as('text')}
+					placeholder={sheetConfig.placeholder}
+					autocomplete="off"
+					class="sheet-input"
+				/>
+				<button type="submit" class="sheet-submit">Add item</button>
 			</form>
 		{/if}
 	</div>
@@ -136,6 +205,7 @@
 		text-transform: uppercase;
 		letter-spacing: var(--letter-spacing-wide);
 		margin: 0 0 var(--space-3);
+		font-family: var(--font-body);
 	}
 
 	.sheet-form {
@@ -150,6 +220,8 @@
 		border-radius: var(--radius-md);
 		padding: var(--space-3) var(--space-4);
 		font-size: var(--font-size-base);
+		font-family: var(--font-body);
+		color: var(--color-text);
 		outline: none;
 		background: var(--color-surface-sunken);
 		box-sizing: border-box;
@@ -160,6 +232,10 @@
 			border-color: var(--color-text);
 			background: var(--color-surface);
 		}
+
+		&::placeholder {
+			color: var(--color-text-subtle);
+		}
 	}
 
 	.sheet-submit {
@@ -169,6 +245,7 @@
 		border-radius: var(--radius-md);
 		padding: var(--space-3);
 		font-size: var(--font-size-base);
+		font-family: var(--font-body);
 		font-weight: var(--font-weight-semibold);
 		cursor: pointer;
 		transition: background var(--duration-fast) var(--ease-standard);

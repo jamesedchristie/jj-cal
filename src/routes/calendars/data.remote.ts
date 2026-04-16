@@ -96,6 +96,39 @@ export const removeEvent = command('unchecked', async ({ id }: { id: number }) =
 	}
 });
 
+export const quickAddEventToday = command('unchecked', async ({ text }: { text: string }) => {
+	const { locals } = getRequestEvent();
+	if (!locals.user) return { success: false };
+	try {
+		const calendars = await getAllCalendars(locals.db);
+		if (calendars.length === 0) return { success: false };
+		// Default to the first calendar — FAB is a quick-add, full dialog handles calendar choice
+		const calendar = calendars[0];
+		const now = Temporal.Now.zonedDateTimeISO('Australia/Sydney');
+		const datetime = Temporal.ZonedDateTime.from({
+			year: now.year,
+			month: now.month,
+			day: now.day,
+			timeZone: 'Australia/Sydney'
+		}).epochMilliseconds;
+		await createEvent(locals.db, {
+			calendarSlug: calendar.slug,
+			calendarId: calendar.id,
+			datetime,
+			text,
+			created_by_name: locals.user.name,
+			created_by_id: locals.user.id
+		});
+		for (const arg of requested(loadEvents, 1)) {
+			void loadEvents(arg).refresh();
+		}
+		return { success: true };
+	} catch (err) {
+		console.log(err);
+		return { success: false };
+	}
+});
+
 export const createNewCalendar = form(
 	v.object({
 		name: v.pipe(v.string(), v.nonEmpty()),
