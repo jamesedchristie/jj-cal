@@ -84,11 +84,17 @@ export function createAuth(db: DrizzleClient) {
 		},
 
 		baseURL: {
-			allowedHosts: ['localhost:5173', 'localhost:5174', 'jj-cal.james-ed-christie1.workers.dev'],
+			allowedHosts: [
+				'localhost:5173',
+				'localhost:5174',
+				'http://192.168.1.103:5173',
+				'jj-cal.james-ed-christie1.workers.dev'
+			],
 			protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
-			fallback: process.env.NODE_ENV === 'production'
-				? 'https://jj-cal.james-ed-christie1.workers.dev'
-				: 'http://localhost:5173'
+			fallback:
+				process.env.NODE_ENV === 'production'
+					? 'https://jj-cal.james-ed-christie1.workers.dev'
+					: 'http://localhost:5173'
 		}
 	});
 }

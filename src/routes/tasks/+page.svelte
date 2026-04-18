@@ -36,14 +36,9 @@
 
 	let selectedAssigneeId = $state<string | null>(null);
 	let selectedRecurrence = $state('');
-	let showAddForm = $state(false);
+	let showMeta = $state(false);
 	let textInputEl = $state<HTMLInputElement | undefined>();
-
-	async function openAddForm() {
-		showAddForm = true;
-		await tick();
-		textInputEl?.focus();
-	}
+	let listEl = $state<HTMLUListElement | undefined>();
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -82,133 +77,7 @@
 		</div>
 	</div>
 
-	{#if showAddForm}
-	<form
-		{...addItem.enhance(async ({ form, submit }) => {
-			const ok = await submit();
-			if (ok) {
-				form.reset();
-				selectedAssigneeId = null;
-				selectedRecurrence = '';
-				showAddForm = false;
-			} else {
-				toastService().show(new ToastMessage('Failed to add task', { type: 'error' }));
-			}
-		})}
-		class="add-form"
-	>
-		<input {...addItem.fields.list_id.as('hidden', effectiveListId)} />
-
-		<div class="add-row">
-			<input bind:this={textInputEl} {...addItem.fields.text.as('text')} placeholder="Add a task…" autocomplete="off" />
-			<button type="submit" aria-label="Add task">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<line x1="12" y1="5" x2="12" y2="19" />
-					<line x1="5" y1="12" x2="19" y2="12" />
-				</svg>
-			</button>
-		</div>
-
-		{#if todoLists.length > 1}
-			<div class="add-meta add-list">
-				<span class="meta-label">List</span>
-				<div class="list-row">
-					{#each todoLists as l (l.id)}
-						<button
-							type="button"
-							class="list-btn"
-							class:selected={effectiveListId === l.id}
-							onclick={() => (selectedListId = l.id)}>{l.name}</button
-						>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		{#if users.length > 0}
-			<div class="add-meta add-assignee">
-				{#if selectedAssigneeId}
-					<input {...addItem.fields.assigned_to_id.as('hidden', selectedAssigneeId)} />
-				{/if}
-				<span class="meta-label">Assign</span>
-				<div class="assignee-row">
-					{#each users as u (u.id)}
-						<button
-							type="button"
-							class="assignee-btn"
-							class:selected={selectedAssigneeId === u.id}
-							title={u.displayName ?? u.name}
-							onclick={() => {
-								selectedAssigneeId = selectedAssigneeId === u.id ? null : u.id;
-							}}
-						>
-							<UserAvatar name={u.name} displayName={u.displayName} colour={u.colour} size="sm" />
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		<div class="add-meta">
-			<label class="due-label">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<rect x="3" y="4" width="18" height="18" rx="2" />
-					<line x1="16" y1="2" x2="16" y2="6" />
-					<line x1="8" y1="2" x2="8" y2="6" />
-					<line x1="3" y1="10" x2="21" y2="10" />
-				</svg>
-				<input {...addItem.fields.due_date.as('date')} />
-			</label>
-		</div>
-
-		<div class="add-meta add-recurrence">
-			{#if selectedRecurrence}
-				<input {...addItem.fields.recurrence_interval.as('hidden', selectedRecurrence)} />
-			{/if}
-			<span class="meta-label">Repeat</span>
-			<div class="recurrence-row">
-				{#each RECURRENCE_INTERVALS as interval (interval)}
-					<button
-						type="button"
-						class="recurrence-btn"
-						class:selected={selectedRecurrence === interval}
-						onclick={() => {
-							selectedRecurrence = selectedRecurrence === interval ? '' : interval;
-						}}>{INTERVAL_LABELS[interval]}</button
-					>
-				{/each}
-			</div>
-		</div>
-	</form>
-	{:else}
-	<button class="add-trigger" onclick={openAddForm}>
-		<span>Add a task…</span>
-		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-			<line x1="12" y1="5" x2="12" y2="19"/>
-			<line x1="5" y1="12" x2="19" y2="12"/>
-		</svg>
-	</button>
-	{/if}
-
-	<ul class="todo-list">
+	<ul class="todo-list" bind:this={listEl}>
 		{#each incomplete as item (item.id)}
 			{@const toggle = toggleItem.for(item.id)}
 			{@const remove = removeItem.for(item.id)}
@@ -274,6 +143,153 @@
 			</li>
 		{/each}
 	</ul>
+
+	<form
+		{...addItem.enhance(async ({ form, submit }) => {
+			const ok = await submit();
+			if (ok) {
+				form.reset();
+				selectedAssigneeId = null;
+				selectedRecurrence = '';
+				showMeta = false;
+				await tick();
+				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+				textInputEl?.focus();
+			} else {
+				toastService().show(new ToastMessage('Failed to add task', { type: 'error' }));
+			}
+		})}
+		class="add-form"
+	>
+		<input {...addItem.fields.list_id.as('hidden', effectiveListId)} />
+		<div class="add-row">
+			<input
+				bind:this={textInputEl}
+				{...addItem.fields.text.as('text')}
+				placeholder="Add a task…"
+				autocomplete="off"
+				autocapitalize="sentences"
+			/>
+			<button
+				type="button"
+				class="meta-toggle"
+				class:active={showMeta}
+				onclick={() => (showMeta = !showMeta)}
+				aria-label="More options"
+				aria-expanded={showMeta}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />
+				</svg>
+			</button>
+			<button type="submit" aria-label="Add task">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<line x1="12" y1="5" x2="12" y2="19" />
+					<line x1="5" y1="12" x2="19" y2="12" />
+				</svg>
+			</button>
+		</div>
+
+		{#if showMeta}
+			{#if todoLists.length > 1}
+				<div class="add-meta add-list">
+					<span class="meta-label">List</span>
+					<div class="list-row">
+						{#each todoLists as l (l.id)}
+							<button
+								type="button"
+								class="list-btn"
+								class:selected={effectiveListId === l.id}
+								onclick={() => (selectedListId = l.id)}>{l.name}</button
+							>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			{#if users.length > 0}
+				<div class="add-meta add-assignee">
+					{#if selectedAssigneeId}
+						<input {...addItem.fields.assigned_to_id.as('hidden', selectedAssigneeId)} />
+					{/if}
+					<span class="meta-label">Assign</span>
+					<div class="assignee-row">
+						{#each users as u (u.id)}
+							<button
+								type="button"
+								class="assignee-btn"
+								class:selected={selectedAssigneeId === u.id}
+								title={u.displayName ?? u.name}
+								onclick={() => {
+									selectedAssigneeId = selectedAssigneeId === u.id ? null : u.id;
+								}}
+							>
+								<UserAvatar name={u.name} displayName={u.displayName} colour={u.colour} size="sm" />
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<div class="add-meta">
+				<label class="due-label">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<rect x="3" y="4" width="18" height="18" rx="2" />
+						<line x1="16" y1="2" x2="16" y2="6" />
+						<line x1="8" y1="2" x2="8" y2="6" />
+						<line x1="3" y1="10" x2="21" y2="10" />
+					</svg>
+					<input {...addItem.fields.due_date.as('date')} />
+				</label>
+			</div>
+
+			<div class="add-meta add-recurrence">
+				{#if selectedRecurrence}
+					<input {...addItem.fields.recurrence_interval.as('hidden', selectedRecurrence)} />
+				{/if}
+				<span class="meta-label">Repeat</span>
+				<div class="recurrence-row">
+					{#each RECURRENCE_INTERVALS as interval (interval)}
+						<button
+							type="button"
+							class="recurrence-btn"
+							class:selected={selectedRecurrence === interval}
+							onclick={() => {
+								selectedRecurrence = selectedRecurrence === interval ? '' : interval;
+							}}>{INTERVAL_LABELS[interval]}</button
+						>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</form>
 
 	{#if complete.length > 0}
 		<details class="completed-section">
@@ -391,47 +407,32 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		margin: 0 var(--space-4) var(--space-4);
+		margin: var(--space-2) var(--space-4) var(--space-4);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		overflow: hidden;
 		background: var(--color-surface);
 	}
 
-	.add-trigger {
+	.meta-toggle {
 		flex: none;
-		align-self: stretch;
+		background: none;
+		border: none;
+		padding: 0 var(--space-2);
+		cursor: pointer;
+		color: var(--color-text-subtle);
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		margin: 0 var(--space-4) var(--space-4);
-		padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		color: var(--color-text-subtle);
-		font-size: var(--font-size-base);
-		font-family: var(--font-body);
-		cursor: pointer;
-		text-align: left;
-		transition: border-color var(--duration-fast) var(--ease-standard),
-			color var(--duration-fast) var(--ease-standard);
+		transition: color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			flex: none;
 			width: var(--space-5);
 			height: var(--space-5);
-			color: var(--color-text-subtle);
-			transition: color var(--duration-fast) var(--ease-standard);
 		}
 
-		&:hover {
-			border-color: var(--color-border-strong);
+		&:hover,
+		&.active {
 			color: var(--color-text-muted);
-
-			svg {
-				color: var(--color-text-muted);
-			}
 		}
 	}
 
@@ -608,7 +609,7 @@
 	.todo-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0 var(--space-4);
+		padding: 0 var(--space-4) var(--space-3);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;

@@ -1,7 +1,13 @@
 @import './styles/tokens.css';
 
+html {
+	height: 100%;
+}
+
 body {
+	height: 100%;
 	margin: 0;
+	overflow: hidden;
 	background: var(--color-bg);
 	color: var(--color-text);
 }

@@ -26,14 +26,9 @@
 
 	let selectedAssigneeId = $state<string | null>(null);
 	let selectedRecurrence = $state('');
-	let showAddForm = $state(false);
+	let showMeta = $state(false);
 	let textInputEl = $state<HTMLInputElement | undefined>();
-
-	async function openAddForm() {
-		showAddForm = true;
-		await tick();
-		textInputEl?.focus();
-	}
+	let listEl = $state<HTMLUListElement | undefined>();
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -94,48 +89,142 @@
 		{/if}
 	</div>
 
-	{#if canEdit && list.type === 'todo'}
-		{#if showAddForm}
-			<form
-				{...addItem.enhance(async ({ form, submit }) => {
-					const ok = await submit();
-					if (ok) {
-						form.reset();
-						selectedAssigneeId = null;
-						selectedRecurrence = '';
-						showAddForm = false;
-					} else {
-						toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
-					}
-				})}
-				class="add-form"
-			>
-				<input {...addItem.fields.list_id.as('hidden', list.id)} />
-
-				<div class="add-row">
-					<input
-						bind:this={textInputEl}
-						{...addItem.fields.text.as('text')}
-						placeholder="Add an item…"
-						autocomplete="off"
-					/>
-					<button type="submit" aria-label="Add item">
+	<ul class="item-list" bind:this={listEl}>
+		{#each incomplete as item (item.id)}
+			{@const toggle = toggleItem.for(item.id)}
+			{@const remove = removeItem.for(item.id)}
+			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
+			{@const assignee = userById(item.assignedToId ?? null)}
+			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
+				<form {...toggle}>
+					<input {...toggle.fields.id.as('hidden', item.id)} />
+					<input {...toggle.fields.list_id.as('hidden', list.id)} />
+					<input {...toggle.fields.completed.as('hidden', 'true')} />
+					<button type="submit" class="check" aria-label="Mark complete">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
-							stroke-width="2.5"
+							stroke-width="2"
 							stroke-linecap="round"
 							stroke-linejoin="round"
 							aria-hidden="true"
 						>
-							<line x1="12" y1="5" x2="12" y2="19" />
-							<line x1="5" y1="12" x2="19" y2="12" />
+							<circle cx="12" cy="12" r="10" />
 						</svg>
 					</button>
-				</div>
+				</form>
+				<span class="text">{item.text}</span>
+				{#if item.dueDate && showDueDate}
+					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
+				{/if}
+				{#if item.recurrenceInterval}
+					<span class="recurrence-chip">{INTERVAL_LABELS[item.recurrenceInterval]}</span>
+				{/if}
+				{#if assignee}
+					<span class="assignee-chip">
+						<UserAvatar
+							name={assignee.name}
+							displayName={assignee.displayName}
+							colour={assignee.colour}
+							size="sm"
+						/>
+					</span>
+				{/if}
+				{#if canEdit}
+					<form {...remove}>
+						<input {...remove.fields.id.as('hidden', item.id)} />
+						<input {...remove.fields.list_id.as('hidden', list.id)} />
+						<button type="submit" class="delete" aria-label="Delete item">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					</form>
+				{/if}
+			</li>
+		{/each}
+	</ul>
 
+	{#if canEdit}
+		<form
+			{...addItem.enhance(async ({ form, submit }) => {
+				const ok = await submit();
+				if (ok) {
+					form.reset();
+					selectedAssigneeId = null;
+					selectedRecurrence = '';
+					showMeta = false;
+					await tick();
+					requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+					textInputEl?.focus();
+				} else {
+					toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+				}
+			})}
+			class="add-form"
+		>
+			<input {...addItem.fields.list_id.as('hidden', list.id)} />
+			<div class="add-row">
+				<input
+					bind:this={textInputEl}
+					{...addItem.fields.text.as('text')}
+					placeholder="Add an item…"
+					autocomplete="off"
+					autocapitalize="sentences"
+				/>
+				{#if list.type === 'todo'}
+					<button
+						type="button"
+						class="meta-toggle"
+						class:active={showMeta}
+						onclick={() => (showMeta = !showMeta)}
+						aria-label="More options"
+						aria-expanded={showMeta}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />
+						</svg>
+					</button>
+				{/if}
+				<button type="submit" aria-label="Add item">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<line x1="12" y1="5" x2="12" y2="19" />
+						<line x1="5" y1="12" x2="19" y2="12" />
+					</svg>
+				</button>
+			</div>
+
+			{#if showMeta}
 				{#if users.length > 0}
 					<div class="add-meta add-assignee">
 						{#if selectedAssigneeId}
@@ -206,94 +295,9 @@
 						{/each}
 					</div>
 				</div>
-			</form>
-		{:else}
-			<button class="add-trigger" onclick={openAddForm}>
-				<span>Add an item…</span>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<line x1="12" y1="5" x2="12" y2="19" />
-					<line x1="5" y1="12" x2="19" y2="12" />
-				</svg>
-			</button>
-		{/if}
+			{/if}
+		</form>
 	{/if}
-
-	<ul class="item-list">
-		{#each incomplete as item (item.id)}
-			{@const toggle = toggleItem.for(item.id)}
-			{@const remove = removeItem.for(item.id)}
-			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
-			{@const assignee = userById(item.assignedToId ?? null)}
-			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
-				<form {...toggle}>
-					<input {...toggle.fields.id.as('hidden', item.id)} />
-					<input {...toggle.fields.list_id.as('hidden', list.id)} />
-					<input {...toggle.fields.completed.as('hidden', 'true')} />
-					<button type="submit" class="check" aria-label="Mark complete">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<circle cx="12" cy="12" r="10" />
-						</svg>
-					</button>
-				</form>
-				<span class="text">{item.text}</span>
-				{#if item.dueDate && showDueDate}
-					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
-				{/if}
-				{#if item.recurrenceInterval}
-					<span class="recurrence-chip">{INTERVAL_LABELS[item.recurrenceInterval]}</span>
-				{/if}
-				{#if assignee}
-					<span class="assignee-chip">
-						<UserAvatar
-							name={assignee.name}
-							displayName={assignee.displayName}
-							colour={assignee.colour}
-							size="sm"
-						/>
-					</span>
-				{/if}
-				{#if canEdit}
-					<form {...remove}>
-						<input {...remove.fields.id.as('hidden', item.id)} />
-						<input {...remove.fields.list_id.as('hidden', list.id)} />
-						<button type="submit" class="delete" aria-label="Delete item">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								aria-hidden="true"
-							>
-								<line x1="18" y1="6" x2="6" y2="18" />
-								<line x1="6" y1="6" x2="18" y2="18" />
-							</svg>
-						</button>
-					</form>
-				{/if}
-			</li>
-		{/each}
-	</ul>
 
 	{#if complete.length > 0}
 		<details class="completed-section">
@@ -429,48 +433,32 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		margin: 0 var(--space-4) var(--space-4);
+		margin: var(--space-2) var(--space-4) var(--space-4);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		overflow: hidden;
 		background: var(--color-surface);
 	}
 
-	.add-trigger {
+	.meta-toggle {
 		flex: none;
-		align-self: stretch;
+		background: none;
+		border: none;
+		padding: 0 var(--space-2);
+		cursor: pointer;
+		color: var(--color-text-subtle);
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		margin: 0 var(--space-4) var(--space-4);
-		padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		color: var(--color-text-subtle);
-		font-size: var(--font-size-base);
-		font-family: var(--font-body);
-		cursor: pointer;
-		text-align: left;
-		transition:
-			border-color var(--duration-fast) var(--ease-standard),
-			color var(--duration-fast) var(--ease-standard);
+		transition: color var(--duration-fast) var(--ease-standard);
 
 		svg {
-			flex: none;
 			width: var(--space-5);
 			height: var(--space-5);
-			color: var(--color-text-subtle);
-			transition: color var(--duration-fast) var(--ease-standard);
 		}
 
-		&:hover {
-			border-color: var(--color-border-strong);
+		&:hover,
+		&.active {
 			color: var(--color-text-muted);
-
-			svg {
-				color: var(--color-text-muted);
-			}
 		}
 	}
 
@@ -597,7 +585,7 @@
 	.item-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 0 var(--space-4);
+		padding: 0 var(--space-4) var(--space-3);
 		display: flex;
 		flex-direction: column;
 		gap: 2px;

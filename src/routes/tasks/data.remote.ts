@@ -71,7 +71,7 @@ export const addItem = form(
 		list_id: v.pipe(v.string(), v.nonEmpty()),
 		text: v.pipe(v.string(), v.nonEmpty()),
 		due_date: v.pipe(
-			v.string(),
+			v.optional(v.string(), ''),
 			v.transform((s) => s || null)
 		),
 		assigned_to_id: v.pipe(

@@ -81,7 +81,7 @@
 		{@render children?.()}
 	</main>
 	{#if data.user}
-		<FAB />
+		<!-- <FAB /> -->
 		<BottomNav />
 	{/if}
 </div>

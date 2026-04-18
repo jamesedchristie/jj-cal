@@ -11,7 +11,7 @@ export class ToastMessage {
 		options?: { type?: 'default' | 'success' | 'error'; detail?: string; timeout?: number }
 	) {
 		const { type = 'default', detail = null, timeout = 2000 } = options || {};
-		this.id = crypto.randomUUID();
+		this.id = Date.now().toString(36) + Math.random().toString(36).slice(2);
 		this.message = msg;
 		this.type = type;
 		this.detail = detail;
