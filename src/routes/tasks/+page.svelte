@@ -101,9 +101,10 @@
 		{...reorderItems.enhance(async ({ submit }) => { await submit(); })}
 		style="display:none"
 	>
-		<input bind:value={reorderIds} {...reorderItems.fields.ids.as('hidden', '')} />
+		<input type="hidden" name="ids" value={reorderIds} />
 	</form>
 
+	<div class="scroll-area">
 	<ul class="todo-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder })}>
 		{#each incomplete as item (item.id)}
 			{@const toggle = toggleItem.for(item.id)}
@@ -206,6 +207,83 @@
 			</li>
 		{/each}
 	</ul>
+
+	{#if recentlyCompleted.length > 0}
+		<details class="completed-section">
+			<summary>{recentlyCompleted.length} completed</summary>
+			<ul class="todo-list completed">
+				{#each recentlyCompleted as item (item.id)}
+					{@const toggle = toggleItem.for(`uncomplete-${item.id}`)}
+					{@const remove = removeItem.for(`done-${item.id}`)}
+					{@const assignee = userById(item.assignedToId ?? null)}
+					<li>
+						<form {...toggle}>
+							<input {...toggle.fields.id.as('hidden', item.id)} />
+							<input {...toggle.fields.completed.as('hidden', 'false')} />
+							<button type="submit" class="check done" aria-label="Mark incomplete">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
+								</svg>
+							</button>
+						</form>
+						<span class="text">{item.text}</span>
+						{#if assignee}
+							<span class="assignee-chip">
+								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
+							</span>
+						{/if}
+						<form {...remove}>
+							<input {...remove.fields.id.as('hidden', item.id)} />
+							<button type="submit" class="delete" aria-label="Delete task">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
+
+	{#if archivedCompleted.length > 0}
+		<details class="completed-section archived-section">
+			<summary>{archivedCompleted.length} archived</summary>
+			<ul class="todo-list completed">
+				{#each archivedCompleted as item (item.id)}
+					{@const toggle = toggleItem.for(`unarchive-${item.id}`)}
+					{@const remove = removeItem.for(`archive-${item.id}`)}
+					{@const assignee = userById(item.assignedToId ?? null)}
+					<li>
+						<form {...toggle}>
+							<input {...toggle.fields.id.as('hidden', item.id)} />
+							<input {...toggle.fields.completed.as('hidden', 'false')} />
+							<button type="submit" class="check done" aria-label="Mark incomplete">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
+								</svg>
+							</button>
+						</form>
+						<span class="text">{item.text}</span>
+						{#if assignee}
+							<span class="assignee-chip">
+								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
+							</span>
+						{/if}
+						<form {...remove}>
+							<input {...remove.fields.id.as('hidden', item.id)} />
+							<button type="submit" class="delete" aria-label="Delete task">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
+	</div>
 
 	<form
 		{...addItem.enhance(async ({ form, submit }) => {
@@ -354,106 +432,6 @@
 		{/if}
 	</form>
 
-	{#if recentlyCompleted.length > 0}
-		<details class="completed-section">
-			<summary>{recentlyCompleted.length} completed</summary>
-			<ul class="todo-list completed">
-				{#each recentlyCompleted as item (item.id)}
-					{@const toggle = toggleItem.for(`uncomplete-${item.id}`)}
-					{@const remove = removeItem.for(`done-${item.id}`)}
-					{@const assignee = userById(item.assignedToId ?? null)}
-					<li>
-						<form {...toggle}>
-							<input {...toggle.fields.id.as('hidden', item.id)} />
-							<input {...toggle.fields.completed.as('hidden', 'false')} />
-							<button type="submit" class="check done" aria-label="Mark incomplete">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									aria-hidden="true"
-								>
-									<circle cx="12" cy="12" r="10" />
-									<path d="M8 12l3 3 5-5" />
-								</svg>
-							</button>
-						</form>
-						<span class="text">{item.text}</span>
-						{#if assignee}
-							<span class="assignee-chip">
-								<UserAvatar
-									name={assignee.name}
-									displayName={assignee.displayName}
-									colour={assignee.colour}
-									size="sm"
-								/>
-							</span>
-						{/if}
-						<form {...remove}>
-							<input {...remove.fields.id.as('hidden', item.id)} />
-							<button type="submit" class="delete" aria-label="Delete task">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									aria-hidden="true"
-								>
-									<line x1="18" y1="6" x2="6" y2="18" />
-									<line x1="6" y1="6" x2="18" y2="18" />
-								</svg>
-							</button>
-						</form>
-					</li>
-				{/each}
-			</ul>
-		</details>
-	{/if}
-
-	{#if archivedCompleted.length > 0}
-		<details class="completed-section archived-section">
-			<summary>{archivedCompleted.length} archived</summary>
-			<ul class="todo-list completed">
-				{#each archivedCompleted as item (item.id)}
-					{@const toggle = toggleItem.for(`unarchive-${item.id}`)}
-					{@const remove = removeItem.for(`archive-${item.id}`)}
-					{@const assignee = userById(item.assignedToId ?? null)}
-					<li>
-						<form {...toggle}>
-							<input {...toggle.fields.id.as('hidden', item.id)} />
-							<input {...toggle.fields.completed.as('hidden', 'false')} />
-							<button type="submit" class="check done" aria-label="Mark incomplete">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
-								</svg>
-							</button>
-						</form>
-						<span class="text">{item.text}</span>
-						{#if assignee}
-							<span class="assignee-chip">
-								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
-							</span>
-						{/if}
-						<form {...remove}>
-							<input {...remove.fields.id.as('hidden', item.id)} />
-							<button type="submit" class="delete" aria-label="Delete task">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-								</svg>
-							</button>
-						</form>
-					</li>
-				{/each}
-			</ul>
-		</details>
-	{/if}
 </div>
 
 <style>
@@ -707,9 +685,13 @@
 		}
 	}
 
-	.todo-list {
+	.scroll-area {
 		flex: 1;
 		overflow-y: auto;
+		padding-bottom: var(--space-4);
+	}
+
+	.todo-list {
 		padding: 0 var(--space-4) var(--space-3);
 		display: flex;
 		flex-direction: column;
@@ -882,8 +864,8 @@
 	}
 
 	.completed-section {
-		flex: none;
-		padding: var(--space-2) var(--space-4) var(--space-4);
+		margin-top: var(--space-8);
+		padding: var(--space-2) var(--space-4) 0;
 
 		summary {
 			cursor: pointer;
@@ -895,8 +877,6 @@
 		}
 
 		.todo-list {
-			flex: none;
-			overflow: visible;
 			padding: 0;
 			margin-top: var(--space-1);
 		}
@@ -927,6 +907,13 @@
 	li:hover .drag-handle,
 	li:focus-within .drag-handle {
 		opacity: 1;
+	}
+
+	@media (pointer: coarse) {
+		.drag-handle,
+		.delete {
+			opacity: 1;
+		}
 	}
 
 	:global(.drag-ghost) {
