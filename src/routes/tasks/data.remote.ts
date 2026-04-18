@@ -6,7 +6,8 @@ import {
 	getTaskItemsForUser,
 	getTodoListsForUser,
 	getUsersBasic,
-	setListItemCompleted
+	setListItemCompleted,
+	updateListItemText
 } from '$lib/server/db/queries';
 import type { RecurrenceInterval } from '$lib/server/db/schema';
 import * as v from 'valibot';
@@ -92,6 +93,20 @@ export const addItem = form(
 			assignedToId: assigned_to_id,
 			recurrenceInterval: recurrence_interval
 		});
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
+	}
+);
+
+export const editItem = form(
+	v.object({
+		id: v.pipe(v.string(), v.nonEmpty()),
+		text: v.pipe(v.string(), v.nonEmpty())
+	}),
+	async ({ id, text }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await updateListItemText(locals.db, id, text.trim());
 		void getTaskItems('mine').refresh();
 		void getTaskItems('all').refresh();
 	}

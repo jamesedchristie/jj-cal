@@ -5,6 +5,7 @@
 	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
 	import {
 		addItem,
+		editItem,
 		getTaskItems,
 		getTodoLists,
 		getUsers,
@@ -21,6 +22,9 @@
 	const allItems = $derived(await getTaskItems(viewMode));
 	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
 	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
+	const oneDayAgo = $derived(Date.now() - 24 * 60 * 60 * 1000);
+	const recentlyCompleted = $derived(complete.filter((t) => t.completedAt && t.completedAt.getTime() > oneDayAgo));
+	const archivedCompleted = $derived(complete.filter((t) => !t.completedAt || t.completedAt.getTime() <= oneDayAgo));
 
 	const todoLists = $derived(await getTodoLists());
 	const users = $derived(await getUsers());
@@ -39,6 +43,12 @@
 	let showMeta = $state(false);
 	let textInputEl = $state<HTMLInputElement | undefined>();
 	let listEl = $state<HTMLUListElement | undefined>();
+	let editingId = $state<string | null>(null);
+	let editInputEl = $state<HTMLInputElement | undefined>();
+
+	$effect(() => {
+		if (editingId !== null) tick().then(() => editInputEl?.select());
+	});
 
 	function formatDueDate(due: string): string {
 		if (due === today) return 'Today';
@@ -102,7 +112,40 @@
 						</svg>
 					</button>
 				</form>
-				<span class="text">{item.text}</span>
+				{#if editingId === item.id}
+					{@const edit = editItem.for(item.id)}
+					<form
+						{...edit.enhance(async ({ submit }) => {
+							const ok = await submit();
+							if (ok) editingId = null;
+							else toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
+						})}
+						class="text-edit-form"
+					>
+						<input {...edit.fields.id.as('hidden', item.id)} />
+						<input
+							bind:this={editInputEl}
+							{...edit.fields.text.as('text')}
+							value={item.text}
+							class="text-edit"
+							autocapitalize="sentences"
+							onkeydown={(e) => { if (e.key === 'Escape') editingId = null; }}
+							onblur={(e) => {
+								const v = e.currentTarget.value.trim();
+								if (v && v !== item.text) e.currentTarget.form?.requestSubmit();
+								else editingId = null;
+							}}
+						/>
+					</form>
+				{:else}
+					<span
+						class="text editable"
+						role="button"
+						tabindex="0"
+						onclick={() => (editingId = item.id)}
+						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingId = item.id; }}
+					>{item.text}</span>
+				{/if}
 				{#if viewMode === 'all' && item.listName}
 					<span class="list-chip">{item.listName}</span>
 				{/if}
@@ -291,11 +334,11 @@
 		{/if}
 	</form>
 
-	{#if complete.length > 0}
+	{#if recentlyCompleted.length > 0}
 		<details class="completed-section">
-			<summary>{complete.length} completed</summary>
+			<summary>{recentlyCompleted.length} completed</summary>
 			<ul class="todo-list completed">
-				{#each complete as item (item.id)}
+				{#each recentlyCompleted as item (item.id)}
 					{@const toggle = toggleItem.for(`uncomplete-${item.id}`)}
 					{@const remove = removeItem.for(`done-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
@@ -345,6 +388,44 @@
 								>
 									<line x1="18" y1="6" x2="6" y2="18" />
 									<line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
+
+	{#if archivedCompleted.length > 0}
+		<details class="completed-section archived-section">
+			<summary>{archivedCompleted.length} archived</summary>
+			<ul class="todo-list completed">
+				{#each archivedCompleted as item (item.id)}
+					{@const toggle = toggleItem.for(`unarchive-${item.id}`)}
+					{@const remove = removeItem.for(`archive-${item.id}`)}
+					{@const assignee = userById(item.assignedToId ?? null)}
+					<li>
+						<form {...toggle}>
+							<input {...toggle.fields.id.as('hidden', item.id)} />
+							<input {...toggle.fields.completed.as('hidden', 'false')} />
+							<button type="submit" class="check done" aria-label="Mark incomplete">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
+								</svg>
+							</button>
+						</form>
+						<span class="text">{item.text}</span>
+						{#if assignee}
+							<span class="assignee-chip">
+								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
+							</span>
+						{/if}
+						<form {...remove}>
+							<input {...remove.fields.id.as('hidden', item.id)} />
+							<button type="submit" class="delete" aria-label="Delete task">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
 								</svg>
 							</button>
 						</form>
@@ -664,10 +745,32 @@
 		line-height: var(--line-height-normal);
 		color: var(--color-text);
 
+		&.editable {
+			cursor: text;
+		}
+
 		.completed & {
 			text-decoration: line-through;
 			color: var(--color-text-subtle);
 		}
+	}
+
+	.text-edit-form {
+		flex: 1;
+		display: flex;
+	}
+
+	.text-edit {
+		flex: 1;
+		border: none;
+		outline: none;
+		padding: 0;
+		font-size: var(--font-size-base);
+		font-family: var(--font-body);
+		line-height: var(--line-height-normal);
+		color: var(--color-text);
+		background: transparent;
+		min-width: 0;
 	}
 
 	.list-chip {
@@ -777,5 +880,11 @@
 			padding: 0;
 			margin-top: var(--space-1);
 		}
+	}
+
+	.archived-section summary {
+		font-size: var(--font-size-xs);
+		color: var(--color-text-subtle);
+		opacity: 0.7;
 	}
 </style>

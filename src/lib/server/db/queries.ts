@@ -446,6 +446,14 @@ export async function createListItem(
 	return rows[0];
 }
 
+export async function updateListItemText(db: DrizzleClient, id: string, text: string) {
+	await db.update(listItemsTable).set({ text }).where(eq(listItemsTable.id, id));
+}
+
+export async function updateListName(db: DrizzleClient, id: string, name: string) {
+	await db.update(listsTable).set({ name }).where(eq(listsTable.id, id));
+}
+
 export async function setListItemCompleted(db: DrizzleClient, id: string, completed: boolean) {
 	const rows = await db
 		.update(listItemsTable)

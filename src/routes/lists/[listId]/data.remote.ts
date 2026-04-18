@@ -7,7 +7,9 @@ import {
 	getListItems,
 	getListWithAccess,
 	getUsersBasic,
-	setListItemCompleted
+	setListItemCompleted,
+	updateListItemText,
+	updateListName
 } from '$lib/server/db/queries';
 import type { RecurrenceInterval } from '$lib/server/db/schema';
 import * as v from 'valibot';
@@ -67,6 +69,32 @@ export const addItem = form(
 			recurrenceInterval: recurrence_interval
 		});
 		void getItems().refresh();
+	}
+);
+
+export const editItem = form(
+	v.object({
+		id: v.pipe(v.string(), v.nonEmpty()),
+		list_id: v.pipe(v.string(), v.nonEmpty()),
+		text: v.pipe(v.string(), v.nonEmpty())
+	}),
+	async ({ id, list_id, text }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await requireEditor(locals.db, list_id, locals.user.id);
+		await updateListItemText(locals.db, id, text.trim());
+		void getItems().refresh();
+	}
+);
+
+export const renameList = form(
+	v.object({ name: v.pipe(v.string(), v.nonEmpty()) }),
+	async ({ name }) => {
+		const { locals, params } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await requireEditor(locals.db, params.listId, locals.user.id);
+		await updateListName(locals.db, params.listId, name.trim());
+		void getList().refresh();
 	}
 );
 
