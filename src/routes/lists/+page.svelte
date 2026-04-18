@@ -108,7 +108,7 @@
 		{...reorderListsCmd.enhance(async ({ submit }) => { await submit(); })}
 		style="display:none"
 	>
-		<input bind:value={reorderIds} {...reorderListsCmd.fields.ids.as('hidden', '')} />
+		<input type="hidden" name="ids" value={reorderIds} />
 	</form>
 
 	{#if lists.length === 0 && !showForm}
