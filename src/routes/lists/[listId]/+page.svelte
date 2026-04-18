@@ -32,6 +32,24 @@
 	let showMeta = $state(false);
 	let textInputEl = $state<HTMLInputElement | undefined>();
 	let listEl = $state<HTMLUListElement | undefined>();
+	let addFormEl = $state<HTMLFormElement | undefined>();
+	let inputText = $state('');
+
+	const suggestions = $derived.by(() => {
+		const q = inputText.trim().toLowerCase();
+		if (!q || list.type === 'todo') return [];
+		const seen = new Set<string>();
+		const out: string[] = [];
+		for (const item of allItems) {
+			const t = item.text.toLowerCase();
+			if (t.startsWith(q) && !seen.has(t)) {
+				seen.add(t);
+				out.push(item.text);
+				if (out.length >= 5) break;
+			}
+		}
+		return out;
+	});
 	let editingId = $state<string | null>(null);
 	let editInputEl = $state<HTMLInputElement | undefined>();
 	let editingListName = $state(false);
@@ -239,10 +257,12 @@
 
 	{#if canEdit}
 		<form
+			bind:this={addFormEl}
 			{...addItem.enhance(async ({ form, submit }) => {
 				const ok = await submit();
 				if (ok) {
 					form.reset();
+					inputText = '';
 					selectedAssigneeId = null;
 					selectedRecurrence = '';
 					showMeta = false;
@@ -259,6 +279,7 @@
 			<div class="add-row">
 				<input
 					bind:this={textInputEl}
+					bind:value={inputText}
 					{...addItem.fields.text.as('text')}
 					placeholder="Add an item…"
 					autocomplete="off"
@@ -303,6 +324,24 @@
 					</svg>
 				</button>
 			</div>
+
+			{#if suggestions.length > 0}
+				<ul class="suggestions">
+					{#each suggestions as s (s)}
+						<li>
+							<button
+								type="button"
+								class="suggestion"
+								onmousedown={(e) => {
+									e.preventDefault();
+									inputText = s;
+									tick().then(() => addFormEl?.requestSubmit());
+								}}
+							>{s}</button>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 
 			{#if showMeta}
 				{#if users.length > 0}
@@ -973,5 +1012,28 @@
 		font-size: var(--font-size-xs);
 		color: var(--color-text-subtle);
 		opacity: 0.7;
+	}
+
+	.suggestions {
+		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.suggestion {
+		display: block;
+		width: 100%;
+		text-align: left;
+		background: none;
+		border: none;
+		padding: var(--space-2) var(--space-4);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard);
+
+		&:hover {
+			background: var(--color-surface-raised);
+			color: var(--color-text);
+		}
 	}
 </style>
