@@ -113,7 +113,8 @@ export const listsTable = sqliteTable('list', {
 	name: text('name').notNull(),
 	type: text('type', { enum: LIST_TYPES }).notNull().default('todo'),
 	createdById: text('created_by_id').notNull().references(() => usersTable.id),
-	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	sortOrder: integer('sort_order').notNull().default(0)
 });
 
 export const RECURRENCE_INTERVALS = ['daily', 'weekly', 'fortnightly', 'monthly'] as const;

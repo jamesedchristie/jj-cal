@@ -6,6 +6,7 @@ import {
 	getTaskItemsForUser,
 	getTodoListsForUser,
 	getUsersBasic,
+	reorderListItems,
 	setListItemCompleted,
 	updateListItemText
 } from '$lib/server/db/queries';
@@ -135,6 +136,17 @@ export const removeItem = form(
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await deleteListItem(locals.db, id);
+		void getTaskItems('mine').refresh();
+		void getTaskItems('all').refresh();
+	}
+);
+
+export const reorderItems = form(
+	v.object({ ids: v.pipe(v.string(), v.nonEmpty()) }),
+	async ({ ids }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await reorderListItems(locals.db, ids.split(','));
 		void getTaskItems('mine').refresh();
 		void getTaskItems('all').refresh();
 	}

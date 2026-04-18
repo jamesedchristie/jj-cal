@@ -1,5 +1,5 @@
 import { form, getRequestEvent, query } from '$app/server';
-import { createList, getListsWithCounts } from '$lib/server/db/queries';
+import { createList, getListsWithCounts, reorderLists } from '$lib/server/db/queries';
 import type { ListType } from '$lib/server/db/schema';
 import * as v from 'valibot';
 
@@ -8,6 +8,16 @@ export const getLists = query(async () => {
 	if (!locals.user) throw 'Not authenticated';
 	return getListsWithCounts(locals.db, locals.user.id);
 });
+
+export const reorderListsCmd = form(
+	v.object({ ids: v.pipe(v.string(), v.nonEmpty()) }),
+	async ({ ids }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await reorderLists(locals.db, ids.split(','));
+		void getLists().refresh();
+	}
+);
 
 export const newList = form(
 	v.object({

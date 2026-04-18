@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { getLists, newList } from './data.remote';
+	import { getLists, newList, reorderListsCmd } from './data.remote';
 	import type { ListType } from '$lib/server/db/schema';
 	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+	import { sortable } from '$lib/sortable';
+	import { tick } from 'svelte';
 
 	const toastService = getToastService();
 
@@ -12,6 +14,17 @@
 
 	let showForm = $state(false);
 	let selectedType = $state<ListType>('shopping');
+	let reorderFormEl = $state<HTMLFormElement>();
+	let reorderIds = $state('');
+	let taskListEl = $state<HTMLUListElement>();
+	let otherListEl = $state<HTMLUListElement>();
+
+	function handleListsReorder() {
+		const taskIds = [...(taskListEl?.querySelectorAll<HTMLElement>('[data-id]') ?? [])].map((n) => n.dataset.id!);
+		const otherIds = [...(otherListEl?.querySelectorAll<HTMLElement>('[data-id]') ?? [])].map((n) => n.dataset.id!);
+		reorderIds = [...taskIds, ...otherIds].filter(Boolean).join(',');
+		tick().then(() => reorderFormEl?.requestSubmit());
+	}
 
 	// Ordered for display: shopping first (most common), todo last (auto-created for personal use)
 	const typeConfig: Record<ListType, { label: string; icon: string }> = {
@@ -90,6 +103,14 @@
 		</form>
 	{/if}
 
+	<form
+		bind:this={reorderFormEl}
+		{...reorderListsCmd.enhance(async ({ submit }) => { await submit(); })}
+		style="display:none"
+	>
+		<input bind:value={reorderIds} {...reorderListsCmd.fields.ids.as('hidden', '')} />
+	</form>
+
 	{#if lists.length === 0 && !showForm}
 		<p class="empty">No lists yet. Create one to get started.</p>
 	{:else}
@@ -100,10 +121,13 @@
 					<span class="section-label">Task lists</span>
 					<a href={resolve('/tasks')} class="section-link">View in Tasks →</a>
 				</div>
-				<ul class="list-cards">
+				<ul class="list-cards" bind:this={taskListEl} {@attach sortable({ onReorder: handleListsReorder })}>
 					{#each taskLists as list (list.id)}
 						{@const cfg = typeConfig[list.type]}
-						<li>
+						<li data-id={list.id}>
+							<span class="drag-handle" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+							</span>
 							<a href={resolve(`/lists/${list.id}`)} class="card card--task">
 								<span class="card-icon">{@html cfg.icon}</span>
 								<span class="card-name">{list.name}</span>
@@ -130,10 +154,13 @@
 					<span class="section-label">Lists</span>
 				</div>
 			{/if}
-			<ul class="list-cards">
+			<ul class="list-cards" bind:this={otherListEl} {@attach sortable({ onReorder: handleListsReorder })}>
 				{#each otherLists as list (list.id)}
 					{@const cfg = typeConfig[list.type]}
-					<li>
+					<li data-id={list.id}>
+						<span class="drag-handle" aria-hidden="true">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+						</span>
 						<a href={resolve(`/lists/${list.id}`)} class="card">
 							<span class="card-icon">{@html cfg.icon}</span>
 							<span class="card-name">{list.name}</span>
@@ -343,9 +370,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+
+		li {
+			display: flex;
+			align-items: center;
+		}
 	}
 
 	.card {
+		flex: 1;
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
@@ -354,10 +387,41 @@
 		text-decoration: none;
 		color: var(--color-text);
 		transition: background var(--duration-fast) var(--ease-standard);
+		min-width: 0;
 
 		&:active {
 			background: var(--color-surface-sunken);
 		}
+	}
+
+	.drag-handle {
+		flex: none;
+		display: flex;
+		align-items: center;
+		color: var(--color-border);
+		cursor: grab;
+		touch-action: none;
+		opacity: 0;
+		padding: var(--space-2) var(--space-1);
+		transition: opacity var(--duration-fast) var(--ease-standard);
+
+		svg {
+			width: var(--space-4);
+			height: var(--space-4);
+		}
+	}
+
+	li:hover .drag-handle,
+	li:focus-within .drag-handle {
+		opacity: 1;
+	}
+
+	:global(.drag-ghost) {
+		opacity: 0.4;
+	}
+
+	:global(.drag-chosen .card) {
+		background: var(--color-surface-raised);
 	}
 
 	.card--task {

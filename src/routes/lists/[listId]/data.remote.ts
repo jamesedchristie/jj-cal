@@ -7,6 +7,7 @@ import {
 	getListItems,
 	getListWithAccess,
 	getUsersBasic,
+	reorderListItems,
 	setListItemCompleted,
 	updateListItemText,
 	updateListName
@@ -123,6 +124,20 @@ export const removeItem = form(
 		if (!locals.user) throw 'Not authenticated';
 		await requireEditor(locals.db, list_id, locals.user.id);
 		await deleteListItem(locals.db, id);
+		void getItems().refresh();
+	}
+);
+
+export const reorderItems = form(
+	v.object({
+		list_id: v.pipe(v.string(), v.nonEmpty()),
+		ids: v.pipe(v.string(), v.nonEmpty())
+	}),
+	async ({ list_id, ids }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await requireEditor(locals.db, list_id, locals.user.id);
+		await reorderListItems(locals.db, ids.split(','));
 		void getItems().refresh();
 	}
 );

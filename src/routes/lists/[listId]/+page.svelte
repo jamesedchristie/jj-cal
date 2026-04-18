@@ -4,7 +4,8 @@
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import { INTERVAL_LABELS, isEffectivelyComplete, RECURRENCE_INTERVALS } from '$lib/recurrence';
 	import { tick } from 'svelte';
-	import { addItem, editItem, getItems, getList, getUsers, removeItem, renameList, toggleItem } from './data.remote';
+	import { addItem, editItem, getItems, getList, getUsers, removeItem, reorderItems, renameList, toggleItem } from './data.remote';
+	import { sortable } from '$lib/sortable';
 
 	const toastService = getToastService();
 
@@ -54,6 +55,13 @@
 	let editInputEl = $state<HTMLInputElement | undefined>();
 	let editingListName = $state(false);
 	let listNameInputEl = $state<HTMLInputElement | undefined>();
+	let reorderFormEl = $state<HTMLFormElement>();
+	let reorderIds = $state('');
+
+	function handleItemsReorder(ids: string[]) {
+		reorderIds = ids.join(',');
+		tick().then(() => reorderFormEl?.requestSubmit());
+	}
 
 	$effect(() => {
 		if (editingId !== null) tick().then(() => editInputEl?.select());
@@ -152,13 +160,18 @@
 		{/if}
 	</div>
 
-	<ul class="item-list" bind:this={listEl}>
+	<ul class="item-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder, disabled: !canEdit })}>
 		{#each incomplete as item (item.id)}
 			{@const toggle = toggleItem.for(item.id)}
 			{@const remove = removeItem.for(item.id)}
 			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
 			{@const assignee = userById(item.assignedToId ?? null)}
-			<li class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
+			<li data-id={item.id} class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
+				{#if canEdit}
+					<span class="drag-handle" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+					</span>
+				{/if}
 				<form {...toggle}>
 					<input {...toggle.fields.id.as('hidden', item.id)} />
 					<input {...toggle.fields.list_id.as('hidden', list.id)} />
@@ -256,6 +269,15 @@
 	</ul>
 
 	{#if canEdit}
+		<form
+			bind:this={reorderFormEl}
+			{...reorderItems.enhance(async ({ submit }) => { await submit(); })}
+			style="display:none"
+		>
+			<input {...reorderItems.fields.list_id.as('hidden', list.id)} />
+			<input bind:value={reorderIds} {...reorderItems.fields.ids.as('hidden', '')} />
+		</form>
+
 		<form
 			bind:this={addFormEl}
 			{...addItem.enhance(async ({ form, submit }) => {
@@ -1012,6 +1034,36 @@
 		font-size: var(--font-size-xs);
 		color: var(--color-text-subtle);
 		opacity: 0.7;
+	}
+
+	.drag-handle {
+		flex: none;
+		display: flex;
+		align-items: center;
+		color: var(--color-border);
+		cursor: grab;
+		touch-action: none;
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-standard);
+
+		svg {
+			width: var(--space-4);
+			height: var(--space-4);
+		}
+	}
+
+	li:hover .drag-handle,
+	li:focus-within .drag-handle {
+		opacity: 1;
+	}
+
+	:global(.drag-ghost) {
+		opacity: 0.4;
+	}
+
+	:global(.drag-chosen) {
+		background: var(--color-surface-raised);
+		border-radius: var(--radius-md);
 	}
 
 	.suggestions {

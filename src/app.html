@@ -10,6 +10,7 @@
 		<link rel="apple-touch-icon" href="/icon-192.png" />
 		%sveltekit.head%
 	</head>
+	<script>if(localStorage.getItem('largeText')==='true')document.documentElement.classList.add('large-text')</script>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>

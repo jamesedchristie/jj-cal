@@ -282,7 +282,7 @@ export async function getListsWithCounts(db: DrizzleClient, userId: string) {
 		.select()
 		.from(listsTable)
 		.where(eq(listsTable.createdById, userId))
-		.orderBy(asc(listsTable.createdAt));
+		.orderBy(asc(listsTable.sortOrder), asc(listsTable.createdAt));
 
 	// Shares granted to this user for lists they don't own
 	const shares = await db
@@ -452,6 +452,22 @@ export async function updateListItemText(db: DrizzleClient, id: string, text: st
 
 export async function updateListName(db: DrizzleClient, id: string, name: string) {
 	await db.update(listsTable).set({ name }).where(eq(listsTable.id, id));
+}
+
+export async function reorderListItems(db: DrizzleClient, orderedIds: string[]) {
+	await Promise.all(
+		orderedIds.map((id, i) =>
+			db.update(listItemsTable).set({ sortOrder: i }).where(eq(listItemsTable.id, id))
+		)
+	);
+}
+
+export async function reorderLists(db: DrizzleClient, orderedIds: string[]) {
+	await Promise.all(
+		orderedIds.map((id, i) =>
+			db.update(listsTable).set({ sortOrder: i }).where(eq(listsTable.id, id))
+		)
+	);
 }
 
 export async function setListItemCompleted(db: DrizzleClient, id: string, completed: boolean) {

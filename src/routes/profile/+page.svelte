@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { browser } from '$app/environment';
 	import Button from '$lib/components/Button.svelte';
 	import TextInput from '$lib/components/TextInput.svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
@@ -27,6 +28,13 @@
 	const { displayName: savedDisplayName, colour: savedColour } = untrack(() => data.user) ?? {};
 	let displayName = $state(savedDisplayName ?? '');
 	let colour = $state(savedColour ?? 'family-6');
+	let largeText = $state(browser ? localStorage.getItem('largeText') === 'true' : false);
+
+	$effect(() => {
+		if (!browser) return;
+		localStorage.setItem('largeText', String(largeText));
+		document.documentElement.classList.toggle('large-text', largeText);
+	});
 </script>
 
 <div class="page">
@@ -85,6 +93,25 @@
 
 		<Button type="submit">Save profile</Button>
 	</form>
+
+	<div class="field">
+		<span class="field-label">Display</span>
+		<label class="size-toggle-row">
+			<span class="size-label">Normal</span>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={largeText}
+				class="switch"
+				class:on={largeText}
+				onclick={() => (largeText = !largeText)}
+			>
+				<span class="switch-thumb"></span>
+			</button>
+			<span class="size-label large">Large</span>
+		</label>
+		<p class="hint">Larger text for when you've left your glasses at home.</p>
+	</div>
 </div>
 
 <style>
@@ -187,6 +214,60 @@
 		&.selected {
 			border-color: var(--color-text);
 			transform: scale(1.15);
+		}
+	}
+
+	.field-label {
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text);
+	}
+
+	.size-toggle-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		cursor: pointer;
+	}
+
+	.size-label {
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+
+		&.large {
+			font-size: var(--font-size-lg);
+		}
+	}
+
+	.switch {
+		position: relative;
+		width: var(--space-10);
+		height: var(--space-6);
+		border-radius: var(--radius-full);
+		background: var(--color-border-strong);
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		transition: background var(--duration-fast) var(--ease-standard);
+
+		&.on {
+			background: var(--color-primary);
+		}
+	}
+
+	.switch-thumb {
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: calc(var(--space-6) - 4px);
+		height: calc(var(--space-6) - 4px);
+		border-radius: var(--radius-full);
+		background: var(--color-surface);
+		transition: transform var(--duration-fast) var(--ease-standard);
+
+		.on & {
+			transform: translateX(calc(var(--space-10) - var(--space-6)));
 		}
 	}
 
