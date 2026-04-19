@@ -430,6 +430,7 @@ export async function getListItems(db: DrizzleClient, listId: string) {
 export async function createListItem(
 	db: DrizzleClient,
 	input: {
+		id?: string;
 		listId: string;
 		text: string;
 		createdById: string;
@@ -439,9 +440,10 @@ export async function createListItem(
 		recurrenceInterval?: RecurrenceInterval | null;
 	}
 ) {
+	const { id: maybeId, ...rest } = input;
 	const rows = await db
 		.insert(listItemsTable)
-		.values({ ...input, id: crypto.randomUUID(), createdAt: new Date() })
+		.values({ ...rest, id: maybeId ?? crypto.randomUUID(), createdAt: new Date() })
 		.returning();
 	return rows[0];
 }

@@ -24,9 +24,32 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				// Installability only — don't cache routes or assets
 				navigateFallback: null,
-				globPatterns: []
+				// Precache JS/CSS bundles and static assets
+				globPatterns: ['**/*.{js,css,ico,png,svg,webmanifest}'],
+				runtimeCaching: [
+					{
+						// Navigation (HTML): try network first, fall back to cache when offline
+						urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
+						handler: 'NetworkFirst' as const,
+						options: {
+							cacheName: 'navigation',
+							networkTimeoutSeconds: 5,
+							expiration: { maxEntries: 32, maxAgeSeconds: 86400 }
+						}
+					},
+					{
+						// Same-origin GET requests (RPC queries, etc.): serve cached immediately,
+						// update in background so the app works offline with recent data
+						urlPattern: ({ sameOrigin, request }: { sameOrigin: boolean; request: Request }) =>
+							sameOrigin && request.method === 'GET',
+						handler: 'StaleWhileRevalidate' as const,
+						options: {
+							cacheName: 'api-get',
+							expiration: { maxEntries: 64, maxAgeSeconds: 86400 }
+						}
+					}
+				]
 			}
 		})
 	]

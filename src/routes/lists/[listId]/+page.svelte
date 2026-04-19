@@ -2,31 +2,93 @@
 	import { resolve } from '$app/paths';
 	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
-	import { INTERVAL_LABELS, isEffectivelyComplete, RECURRENCE_INTERVALS } from '$lib/recurrence';
+	import { INTERVAL_LABELS, isEffectivelyComplete, RECURRENCE_INTERVALS, type RecurrenceInterval } from '$lib/recurrence';
 	import { tick } from 'svelte';
 	import { addItem, editItem, getItems, getList, getUsers, removeItem, reorderItems, renameList, toggleItem } from './data.remote';
 	import { sortable } from '$lib/sortable';
+	import { offlineQueue } from '$lib/offline-queue.svelte';
 
 	const toastService = getToastService();
 
 	const list = $derived(await getList());
-	const allItems = $derived(await getItems());
+	const serverItems = $derived(await getItems());
+	const users = $derived(await getUsers());
+
+	// Optimistic UI state
+	type Item = Awaited<ReturnType<typeof getItems>>[number];
+	type OptimisticPatch =
+		| { id: string; kind: 'toggle'; itemId: string; completed: boolean; completedAt: Date | null }
+		| { id: string; kind: 'add'; item: Item }
+		| { id: string; kind: 'delete'; itemId: string }
+		| { id: string; kind: 'edit'; itemId: string; text: string };
+
+	let patches = $state<OptimisticPatch[]>([]);
+
+	function applyPatches(base: Item[]): Item[] {
+		if (patches.length === 0) return base;
+		let items = [...base];
+		for (const p of patches) {
+			if (p.kind === 'toggle') {
+				items = items.map((i) =>
+					i.id === p.itemId ? { ...i, completed: p.completed, completedAt: p.completedAt } : i
+				);
+			} else if (p.kind === 'add') {
+				if (!items.some((i) => i.id === p.item.id)) items = [...items, p.item];
+			} else if (p.kind === 'delete') {
+				items = items.filter((i) => i.id !== p.itemId);
+			} else if (p.kind === 'edit') {
+				items = items.map((i) => (i.id === p.itemId ? { ...i, text: p.text } : i));
+			}
+		}
+		return items;
+	}
+
+	const allItems = $derived(applyPatches(serverItems));
 	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
 	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
 	const oneDayAgo = $derived(Date.now() - 24 * 60 * 60 * 1000);
 	const recentlyCompleted = $derived(complete.filter((t) => t.completedAt && t.completedAt.getTime() > oneDayAgo));
 	const archivedCompleted = $derived(complete.filter((t) => !t.completedAt || t.completedAt.getTime() <= oneDayAgo));
-	const users = $derived(await getUsers());
+
+	// Reconcile patches against server state
+	$effect(() => {
+		let changed = false;
+		let next = patches;
+		for (const p of patches) {
+			let confirmed = false;
+			if (p.kind === 'toggle') {
+				const s = serverItems.find((i) => i.id === p.itemId);
+				confirmed = !!s && s.completed === p.completed;
+			} else if (p.kind === 'edit') {
+				const s = serverItems.find((i) => i.id === p.itemId);
+				confirmed = !!s && s.text === p.text;
+			} else if (p.kind === 'delete') {
+				confirmed = !serverItems.some((i) => i.id === p.itemId);
+			} else if (p.kind === 'add') {
+				confirmed = serverItems.some((i) => i.id === p.item.id);
+			}
+			if (confirmed) {
+				next = next.filter((n) => n.id !== p.id);
+				changed = true;
+			}
+		}
+		if (changed) patches = next;
+	});
+
+	// Clear patches when queue drains
+	$effect(() => {
+		return offlineQueue.onDrained(() => {
+			patches = [];
+			void getItems().refresh();
+		});
+	});
 
 	// Shopping lists don't need due dates
 	const showDueDate = $derived(list.type !== 'shopping');
 	// Viewers can see items but cannot add/edit/delete
 	const canEdit = $derived(list.role === 'owner' || list.role === 'editor');
 
-	// Today's date in Sydney time as YYYY-MM-DD
-	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(
-		new Date()
-	);
+	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
 
 	let selectedAssigneeId = $state<string | null>(null);
 	let selectedRecurrence = $state('');
@@ -86,6 +148,116 @@
 	function userById(id: string | null) {
 		if (!id) return null;
 		return users.find((u) => u.id === id) ?? null;
+	}
+
+	function enqueueForm(form: HTMLFormElement): void {
+		offlineQueue.enqueue(
+			form.action,
+			new URLSearchParams(new FormData(form) as unknown as Record<string, string>).toString()
+		);
+	}
+
+	function handleToggle(itemId: string, newCompleted: boolean) {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			const patchId = crypto.randomUUID();
+			patches = [
+				...patches,
+				{ id: patchId, kind: 'toggle', itemId, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
+			];
+			const ok = await submit();
+			if (!ok) {
+				if (!offlineQueue.online) {
+					enqueueForm(form);
+				} else {
+					patches = patches.filter((p) => p.id !== patchId);
+					toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
+				}
+			}
+		};
+	}
+
+	function handleDelete(itemId: string) {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			const patchId = crypto.randomUUID();
+			patches = [...patches, { id: patchId, kind: 'delete', itemId }];
+			const ok = await submit();
+			if (!ok) {
+				if (!offlineQueue.online) {
+					enqueueForm(form);
+				} else {
+					patches = patches.filter((p) => p.id !== patchId);
+					toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
+				}
+			}
+		};
+	}
+
+	function handleEdit(itemId: string, oldText: string) {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			const formData = new FormData(form);
+			const newText = (formData.get('text') as string)?.trim() || oldText;
+			if (newText === oldText) {
+				editingId = null;
+				return;
+			}
+			const patchId = crypto.randomUUID();
+			patches = [...patches, { id: patchId, kind: 'edit', itemId, text: newText }];
+			editingId = null;
+			const ok = await submit();
+			if (!ok) {
+				patches = patches.filter((p) => p.id !== patchId);
+				toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
+			}
+		};
+	}
+
+	function handleAddItem() {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			const formData = new FormData(form);
+			const text = (formData.get('text') as string)?.trim();
+			if (!text) return;
+			const tempId = crypto.randomUUID();
+			const idInput = form.elements.namedItem('id') as HTMLInputElement | null;
+			if (idInput) idInput.value = tempId;
+
+			const patchId = crypto.randomUUID();
+			const newItem: Item = {
+				id: tempId,
+				listId: list.id,
+				text,
+				completed: false,
+				completedAt: null,
+				dueDate: (formData.get('due_date') as string) || null,
+				assignedToId: (formData.get('assigned_to_id') as string) || null,
+				recurrenceInterval: ((formData.get('recurrence_interval') as string) || null) as RecurrenceInterval | null,
+				sortOrder: Date.now(),
+				createdAt: new Date(),
+				createdById: ''
+			};
+			patches = [...patches, { id: patchId, kind: 'add', item: newItem }];
+
+			const ok = await submit();
+			if (ok) {
+				form.reset();
+				inputText = '';
+				selectedAssigneeId = null;
+				selectedRecurrence = '';
+				showMeta = false;
+				await tick();
+				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+				textInputEl?.focus();
+			} else if (!offlineQueue.online) {
+				enqueueForm(form);
+				form.reset();
+				inputText = '';
+				selectedAssigneeId = null;
+				selectedRecurrence = '';
+				showMeta = false;
+			} else {
+				patches = patches.filter((p) => p.id !== patchId);
+				toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+			}
+		};
 	}
 </script>
 
@@ -167,13 +339,13 @@
 			{@const remove = removeItem.for(item.id)}
 			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
 			{@const assignee = userById(item.assignedToId ?? null)}
-			<li data-id={item.id} class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
+			<li data-id={item.id} class:overdue={status === 'overdue'}>
 				{#if canEdit}
 					<span class="drag-handle" aria-hidden="true">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
 					</span>
 				{/if}
-				<form {...toggle}>
+				<form {...toggle.enhance(handleToggle(item.id, true))}>
 					<input {...toggle.fields.id.as('hidden', item.id)} />
 					<input {...toggle.fields.list_id.as('hidden', list.id)} />
 					<input {...toggle.fields.completed.as('hidden', 'true')} />
@@ -195,11 +367,7 @@
 				{#if editingId === item.id && canEdit}
 					{@const edit = editItem.for(item.id)}
 					<form
-						{...edit.enhance(async ({ submit }) => {
-							const ok = await submit();
-							if (ok) editingId = null;
-							else toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
-						})}
+						{...edit.enhance(handleEdit(item.id, item.text))}
 						class="text-edit-form"
 					>
 						<input {...edit.fields.id.as('hidden', item.id)} />
@@ -245,7 +413,7 @@
 					</span>
 				{/if}
 				{#if canEdit}
-					<form {...remove}>
+					<form {...remove.enhance(handleDelete(item.id))}>
 						<input {...remove.fields.id.as('hidden', item.id)} />
 						<input {...remove.fields.list_id.as('hidden', list.id)} />
 						<button type="submit" class="delete" aria-label="Delete item">
@@ -278,7 +446,7 @@
 					{@const remove = removeItem.for(`done-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
+						<form {...toggle.enhance(handleToggle(item.id, false))}>
 							<input {...toggle.fields.id.as('hidden', item.id)} />
 							<input {...toggle.fields.list_id.as('hidden', list.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
@@ -295,7 +463,7 @@
 							</span>
 						{/if}
 						{#if canEdit}
-							<form {...remove}>
+							<form {...remove.enhance(handleDelete(item.id))}>
 								<input {...remove.fields.id.as('hidden', item.id)} />
 								<input {...remove.fields.list_id.as('hidden', list.id)} />
 								<button type="submit" class="delete" aria-label="Delete item">
@@ -320,7 +488,7 @@
 					{@const remove = removeItem.for(`archive-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
+						<form {...toggle.enhance(handleToggle(item.id, false))}>
 							<input {...toggle.fields.id.as('hidden', item.id)} />
 							<input {...toggle.fields.list_id.as('hidden', list.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
@@ -337,7 +505,7 @@
 							</span>
 						{/if}
 						{#if canEdit}
-							<form {...remove}>
+							<form {...remove.enhance(handleDelete(item.id))}>
 								<input {...remove.fields.id.as('hidden', item.id)} />
 								<input {...remove.fields.list_id.as('hidden', list.id)} />
 								<button type="submit" class="delete" aria-label="Delete item">
@@ -366,23 +534,10 @@
 
 		<form
 			bind:this={addFormEl}
-			{...addItem.enhance(async ({ form, submit }) => {
-				const ok = await submit();
-				if (ok) {
-					form.reset();
-					inputText = '';
-					selectedAssigneeId = null;
-					selectedRecurrence = '';
-					showMeta = false;
-					await tick();
-					requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
-					textInputEl?.focus();
-				} else {
-					toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
-				}
-			})}
+			{...addItem.enhance(handleAddItem())}
 			class="add-form"
 		>
+			<input type="hidden" name="id" />
 			<input {...addItem.fields.list_id.as('hidden', list.id)} />
 			<div class="add-row">
 				<input
