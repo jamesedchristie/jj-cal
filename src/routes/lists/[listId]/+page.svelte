@@ -6,6 +6,7 @@
 	import { tick } from 'svelte';
 	import { addItem, editItem, getItems, getList, getUsers, removeItem, reorderItems, renameList, toggleItem } from './data.remote';
 	import { sortable } from '$lib/sortable';
+	import { offlineQueue } from '$lib/offline-queue.svelte';
 
 	const toastService = getToastService();
 
@@ -86,6 +87,15 @@
 	function userById(id: string | null) {
 		if (!id) return null;
 		return users.find((u) => u.id === id) ?? null;
+	}
+
+	function handleToggleFail(form: HTMLFormElement) {
+		if (!navigator.onLine) {
+			offlineQueue.enqueue(form.action, new URLSearchParams(new FormData(form) as unknown as Record<string, string>).toString());
+			toastService().show(new ToastMessage('Queued — will sync when reconnected'));
+		} else {
+			toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
+		}
 	}
 </script>
 
@@ -173,7 +183,7 @@
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
 					</span>
 				{/if}
-				<form {...toggle}>
+				<form {...toggle.enhance(async ({ form, submit }) => { if (!await submit()) handleToggleFail(form); })}>
 					<input {...toggle.fields.id.as('hidden', item.id)} />
 					<input {...toggle.fields.list_id.as('hidden', list.id)} />
 					<input {...toggle.fields.completed.as('hidden', 'true')} />
@@ -278,7 +288,7 @@
 					{@const remove = removeItem.for(`done-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
+						<form {...toggle.enhance(async ({ form, submit }) => { if (!await submit()) handleToggleFail(form); })}>
 							<input {...toggle.fields.id.as('hidden', item.id)} />
 							<input {...toggle.fields.list_id.as('hidden', list.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
@@ -320,7 +330,7 @@
 					{@const remove = removeItem.for(`archive-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
+						<form {...toggle.enhance(async ({ form, submit }) => { if (!await submit()) handleToggleFail(form); })}>
 							<input {...toggle.fields.id.as('hidden', item.id)} />
 							<input {...toggle.fields.list_id.as('hidden', list.id)} />
 							<input {...toggle.fields.completed.as('hidden', 'false')} />
@@ -377,6 +387,14 @@
 					await tick();
 					requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
 					textInputEl?.focus();
+				} else if (!navigator.onLine) {
+					offlineQueue.enqueue(form.action, new URLSearchParams(new FormData(form) as unknown as Record<string, string>).toString());
+					form.reset();
+					inputText = '';
+					selectedAssigneeId = null;
+					selectedRecurrence = '';
+					showMeta = false;
+					toastService().show(new ToastMessage('Queued — will sync when reconnected'));
 				} else {
 					toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
 				}

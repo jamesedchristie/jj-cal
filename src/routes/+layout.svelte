@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { authClient } from '$lib/auth-client';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import FAB from '$lib/components/FAB.svelte';
 	import Toast from '$lib/components/toast/Toast.svelte';
@@ -77,6 +78,7 @@
 			{/if}
 		</div>
 	</header>
+	<OfflineBanner />
 	<main>
 		{@render children?.()}
 	</main>
