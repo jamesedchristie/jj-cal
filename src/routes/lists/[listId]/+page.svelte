@@ -7,27 +7,30 @@
 	import { addItem, editItem, getItems, getList, getUsers, removeItem, reorderItems, renameList, toggleItem } from './data.remote';
 	import { sortable } from '$lib/sortable';
 	import { offlineQueue } from '$lib/offline-queue.svelte';
+	import { listStore, type ListItem } from '$lib/list-store.svelte';
 
 	const toastService = getToastService();
 
 	const list = $derived(await getList());
-	const allItems = $derived(await getItems());
+	const serverItems = $derived(await getItems());
 	const users = $derived(await getUsers());
 
+	const allItems = $derived(listStore.getItems(list.id));
 	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
 	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
 	const oneDayAgo = $derived(Date.now() - 24 * 60 * 60 * 1000);
 	const recentlyCompleted = $derived(complete.filter((t) => t.completedAt && t.completedAt.getTime() > oneDayAgo));
 	const archivedCompleted = $derived(complete.filter((t) => !t.completedAt || t.completedAt.getTime() <= oneDayAgo));
 
-	// Refresh items after offline queue drains
+	// Keep store in sync when server data refreshes
+	$effect(() => { listStore.sync(list.id, serverItems); });
+
+	// After queue drains, re-sync from server
 	$effect(() => {
 		return offlineQueue.onDrained(() => void getItems().refresh());
 	});
 
-	// Shopping lists don't need due dates
 	const showDueDate = $derived(list.type !== 'shopping');
-	// Viewers can see items but cannot add/edit/delete
 	const canEdit = $derived(list.role === 'owner' || list.role === 'editor');
 
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
@@ -36,6 +39,7 @@
 	let selectedRecurrence = $state('');
 	let showMeta = $state(false);
 	let textInputEl = $state<HTMLInputElement | undefined>();
+	let scrollAreaEl = $state<HTMLElement | undefined>();
 	let listEl = $state<HTMLUListElement | undefined>();
 	let addFormEl = $state<HTMLFormElement | undefined>();
 	let inputText = $state('');
@@ -99,60 +103,67 @@
 		);
 	}
 
-	type Item = Awaited<ReturnType<typeof getItems>>[number];
-
 	function handleToggle(itemId: string, newCompleted: boolean) {
-		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
-			submit().updates(
-				getItems().withOverride((items) =>
-					items.map((i) =>
-						i.id === itemId
-							? { ...i, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
-							: i
-					)
-				)
-			).catch(() => {
-				if (!offlineQueue.online) enqueueForm(form);
-				else toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			listStore.toggle(list.id, itemId, newCompleted);
+			submit().then((ok) => {
+				if (!ok) {
+					listStore.toggle(list.id, itemId, !newCompleted);
+					if (!offlineQueue.online) enqueueForm(form);
+					else toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
+				}
 			});
 		};
 	}
 
 	function handleDelete(itemId: string) {
-		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
-			submit().updates(
-				getItems().withOverride((items) => items.filter((i) => i.id !== itemId))
-			).catch(() => {
-				if (!offlineQueue.online) enqueueForm(form);
-				else toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+			const item = listStore.getItems(list.id).find((i) => i.id === itemId);
+			listStore.remove(list.id, itemId);
+			submit().then((ok) => {
+				if (!ok) {
+					if (item) listStore.revertRemove(list.id, item);
+					if (!offlineQueue.online) enqueueForm(form);
+					else toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
+				}
 			});
 		};
 	}
 
 	function handleEdit(itemId: string, oldText: string) {
-		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
 			const formData = new FormData(form);
 			const newText = (formData.get('text') as string)?.trim() || oldText;
 			if (newText === oldText) { editingId = null; return; }
 			editingId = null;
-			submit().updates(
-				getItems().withOverride((items) =>
-					items.map((i) => i.id === itemId ? { ...i, text: newText } : i)
-				)
-			).catch(() => {
-				toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
+			listStore.edit(list.id, itemId, newText);
+			submit().then((ok) => {
+				if (!ok) {
+					listStore.edit(list.id, itemId, oldText);
+					toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
+				}
 			});
 		};
 	}
 
 	function handleAddItem() {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
 			const formData = new FormData(form);
 			const text = (formData.get('text') as string)?.trim();
 			if (!text) return;
 
-			const newItem: Item = {
-				id: crypto.randomUUID(),
+			// Stamp a client-generated ID so the server creates the item with this ID,
+			// enabling store sync to confirm it on refresh.
+			const tempId = crypto.randomUUID();
+			const idInput = form.querySelector('input[name="id"]') as HTMLInputElement | null;
+			if (idInput) idInput.value = tempId;
+
+			// Capture body (with tempId) before form.reset() clears it
+			const body = new URLSearchParams(new FormData(form) as unknown as Record<string, string>).toString();
+			const action = form.action;
+
+			const newItem: ListItem = {
+				id: tempId,
 				listId: list.id,
 				text,
 				completed: false,
@@ -165,16 +176,15 @@
 				createdById: ''
 			};
 
-			// Capture serialized body before form reset (for offline queue)
-			const serializedBody = new URLSearchParams(formData as unknown as Record<string, string>).toString();
-			const actionUrl = form.action;
+			listStore.add(newItem);
 
-			// Fire the mutation without awaiting — form data is captured synchronously
-			submit().updates(
-				getItems().withOverride((items) => [...items, newItem])
-			).catch(() => {
-				if (!offlineQueue.online) offlineQueue.enqueue(actionUrl, serializedBody);
-				else toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+			// Fire without awaiting — submit() captures form data (with tempId) synchronously
+			submit().then((ok) => {
+				if (!ok) {
+					listStore.revertAdd(list.id, tempId);
+					if (!offlineQueue.online) offlineQueue.enqueue(action, body);
+					else toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+				}
 			});
 
 			// Reset UI immediately
@@ -184,7 +194,7 @@
 			selectedRecurrence = '';
 			showMeta = false;
 			await tick();
-			requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+			requestAnimationFrame(() => scrollAreaEl?.scrollTo({ top: scrollAreaEl.scrollHeight, behavior: 'smooth' }));
 			textInputEl?.focus();
 		};
 	}
@@ -261,7 +271,7 @@
 		{/if}
 	</div>
 
-	<div class="scroll-area">
+	<div class="scroll-area" bind:this={scrollAreaEl}>
 	<ul class="item-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder, disabled: !canEdit })}>
 		{#each incomplete as item (item.id)}
 			{@const toggle = toggleItem.for(item.id)}
@@ -467,6 +477,7 @@
 			class="add-form"
 		>
 			<input {...addItem.fields.list_id.as('hidden', list.id)} />
+			<input type="hidden" name="id" />
 			<div class="add-row">
 				<input
 					bind:this={textInputEl}
