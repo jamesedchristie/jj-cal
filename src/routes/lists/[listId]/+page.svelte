@@ -11,76 +11,18 @@
 	const toastService = getToastService();
 
 	const list = $derived(await getList());
-	const serverItems = $derived(await getItems());
+	const allItems = $derived(await getItems());
 	const users = $derived(await getUsers());
 
-	// Optimistic UI state
-	type Item = Awaited<ReturnType<typeof getItems>>[number];
-	type OptimisticPatch =
-		| { id: string; kind: 'toggle'; itemId: string; completed: boolean; completedAt: Date | null }
-		| { id: string; kind: 'add'; item: Item }
-		| { id: string; kind: 'delete'; itemId: string }
-		| { id: string; kind: 'edit'; itemId: string; text: string };
-
-	let patches = $state<OptimisticPatch[]>([]);
-
-	function applyPatches(base: Item[]): Item[] {
-		if (patches.length === 0) return base;
-		let items = [...base];
-		for (const p of patches) {
-			if (p.kind === 'toggle') {
-				items = items.map((i) =>
-					i.id === p.itemId ? { ...i, completed: p.completed, completedAt: p.completedAt } : i
-				);
-			} else if (p.kind === 'add') {
-				if (!items.some((i) => i.id === p.item.id)) items = [...items, p.item];
-			} else if (p.kind === 'delete') {
-				items = items.filter((i) => i.id !== p.itemId);
-			} else if (p.kind === 'edit') {
-				items = items.map((i) => (i.id === p.itemId ? { ...i, text: p.text } : i));
-			}
-		}
-		return items;
-	}
-
-	const allItems = $derived(applyPatches(serverItems));
 	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
 	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
 	const oneDayAgo = $derived(Date.now() - 24 * 60 * 60 * 1000);
 	const recentlyCompleted = $derived(complete.filter((t) => t.completedAt && t.completedAt.getTime() > oneDayAgo));
 	const archivedCompleted = $derived(complete.filter((t) => !t.completedAt || t.completedAt.getTime() <= oneDayAgo));
 
-	// Reconcile patches against server state
+	// Refresh items after offline queue drains
 	$effect(() => {
-		let changed = false;
-		let next = patches;
-		for (const p of patches) {
-			let confirmed = false;
-			if (p.kind === 'toggle') {
-				const s = serverItems.find((i) => i.id === p.itemId);
-				confirmed = !!s && s.completed === p.completed;
-			} else if (p.kind === 'edit') {
-				const s = serverItems.find((i) => i.id === p.itemId);
-				confirmed = !!s && s.text === p.text;
-			} else if (p.kind === 'delete') {
-				confirmed = !serverItems.some((i) => i.id === p.itemId);
-			} else if (p.kind === 'add') {
-				confirmed = serverItems.some((i) => i.id === p.item.id);
-			}
-			if (confirmed) {
-				next = next.filter((n) => n.id !== p.id);
-				changed = true;
-			}
-		}
-		if (changed) patches = next;
-	});
-
-	// Clear patches when queue drains
-	$effect(() => {
-		return offlineQueue.onDrained(() => {
-			patches = [];
-			void getItems().refresh();
-		});
+		return offlineQueue.onDrained(() => void getItems().refresh());
 	});
 
 	// Shopping lists don't need due dates
@@ -157,72 +99,66 @@
 		);
 	}
 
+	type Item = Awaited<ReturnType<typeof getItems>>[number];
+
 	function handleToggle(itemId: string, newCompleted: boolean) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
-			const patchId = crypto.randomUUID();
-			patches = [
-				...patches,
-				{ id: patchId, kind: 'toggle', itemId, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
-			];
-			const ok = await submit();
-			if (!ok) {
-				if (!offlineQueue.online) {
-					enqueueForm(form);
-				} else {
-					patches = patches.filter((p) => p.id !== patchId);
-					toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
-				}
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+			try {
+				await submit().updates(
+					getItems().withOverride((items) =>
+						items.map((i) =>
+							i.id === itemId
+								? { ...i, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
+								: i
+						)
+					)
+				);
+			} catch {
+				if (!offlineQueue.online) enqueueForm(form);
+				else toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
 			}
 		};
 	}
 
 	function handleDelete(itemId: string) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
-			const patchId = crypto.randomUUID();
-			patches = [...patches, { id: patchId, kind: 'delete', itemId }];
-			const ok = await submit();
-			if (!ok) {
-				if (!offlineQueue.online) {
-					enqueueForm(form);
-				} else {
-					patches = patches.filter((p) => p.id !== patchId);
-					toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
-				}
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+			try {
+				await submit().updates(
+					getItems().withOverride((items) => items.filter((i) => i.id !== itemId))
+				);
+			} catch {
+				if (!offlineQueue.online) enqueueForm(form);
+				else toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
 			}
 		};
 	}
 
 	function handleEdit(itemId: string, oldText: string) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
 			const formData = new FormData(form);
 			const newText = (formData.get('text') as string)?.trim() || oldText;
-			if (newText === oldText) {
-				editingId = null;
-				return;
-			}
-			const patchId = crypto.randomUUID();
-			patches = [...patches, { id: patchId, kind: 'edit', itemId, text: newText }];
+			if (newText === oldText) { editingId = null; return; }
 			editingId = null;
-			const ok = await submit();
-			if (!ok) {
-				patches = patches.filter((p) => p.id !== patchId);
+			try {
+				await submit().updates(
+					getItems().withOverride((items) =>
+						items.map((i) => i.id === itemId ? { ...i, text: newText } : i)
+					)
+				);
+			} catch {
 				toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
 			}
 		};
 	}
 
 	function handleAddItem() {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> }) => {
+		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
 			const formData = new FormData(form);
 			const text = (formData.get('text') as string)?.trim();
 			if (!text) return;
-			const tempId = crypto.randomUUID();
-			const idInput = form.elements.namedItem('id') as HTMLInputElement | null;
-			if (idInput) idInput.value = tempId;
 
-			const patchId = crypto.randomUUID();
 			const newItem: Item = {
-				id: tempId,
+				id: crypto.randomUUID(),
 				listId: list.id,
 				text,
 				completed: false,
@@ -234,10 +170,11 @@
 				createdAt: new Date(),
 				createdById: ''
 			};
-			patches = [...patches, { id: patchId, kind: 'add', item: newItem }];
 
-			const ok = await submit();
-			if (ok) {
+			try {
+				await submit().updates(
+					getItems().withOverride((items) => [...items, newItem])
+				);
 				form.reset();
 				inputText = '';
 				selectedAssigneeId = null;
@@ -246,16 +183,17 @@
 				await tick();
 				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
 				textInputEl?.focus();
-			} else if (!offlineQueue.online) {
-				enqueueForm(form);
-				form.reset();
-				inputText = '';
-				selectedAssigneeId = null;
-				selectedRecurrence = '';
-				showMeta = false;
-			} else {
-				patches = patches.filter((p) => p.id !== patchId);
-				toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+			} catch {
+				if (!offlineQueue.online) {
+					enqueueForm(form);
+					form.reset();
+					inputText = '';
+					selectedAssigneeId = null;
+					selectedRecurrence = '';
+					showMeta = false;
+				} else {
+					toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+				}
 			}
 		};
 	}
@@ -537,7 +475,6 @@
 			{...addItem.enhance(handleAddItem())}
 			class="add-form"
 		>
-			<input type="hidden" name="id" />
 			<input {...addItem.fields.list_id.as('hidden', list.id)} />
 			<div class="add-row">
 				<input
