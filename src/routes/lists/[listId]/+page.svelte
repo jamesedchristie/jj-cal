@@ -102,52 +102,46 @@
 	type Item = Awaited<ReturnType<typeof getItems>>[number];
 
 	function handleToggle(itemId: string, newCompleted: boolean) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
-			try {
-				await submit().updates(
-					getItems().withOverride((items) =>
-						items.map((i) =>
-							i.id === itemId
-								? { ...i, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
-								: i
-						)
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+			submit().updates(
+				getItems().withOverride((items) =>
+					items.map((i) =>
+						i.id === itemId
+							? { ...i, completed: newCompleted, completedAt: newCompleted ? new Date() : null }
+							: i
 					)
-				);
-			} catch {
+				)
+			).catch(() => {
 				if (!offlineQueue.online) enqueueForm(form);
 				else toastService().show(new ToastMessage('Failed to update item', { type: 'error' }));
-			}
+			});
 		};
 	}
 
 	function handleDelete(itemId: string) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
-			try {
-				await submit().updates(
-					getItems().withOverride((items) => items.filter((i) => i.id !== itemId))
-				);
-			} catch {
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+			submit().updates(
+				getItems().withOverride((items) => items.filter((i) => i.id !== itemId))
+			).catch(() => {
 				if (!offlineQueue.online) enqueueForm(form);
 				else toastService().show(new ToastMessage('Failed to delete item', { type: 'error' }));
-			}
+			});
 		};
 	}
 
 	function handleEdit(itemId: string, oldText: string) {
-		return async ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
+		return ({ form, submit }: { form: HTMLFormElement; submit: () => Promise<boolean> & { updates: (q: unknown) => Promise<void> } }) => {
 			const formData = new FormData(form);
 			const newText = (formData.get('text') as string)?.trim() || oldText;
 			if (newText === oldText) { editingId = null; return; }
 			editingId = null;
-			try {
-				await submit().updates(
-					getItems().withOverride((items) =>
-						items.map((i) => i.id === itemId ? { ...i, text: newText } : i)
-					)
-				);
-			} catch {
+			submit().updates(
+				getItems().withOverride((items) =>
+					items.map((i) => i.id === itemId ? { ...i, text: newText } : i)
+				)
+			).catch(() => {
 				toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
-			}
+			});
 		};
 	}
 
@@ -171,30 +165,27 @@
 				createdById: ''
 			};
 
-			try {
-				await submit().updates(
-					getItems().withOverride((items) => [...items, newItem])
-				);
-				form.reset();
-				inputText = '';
-				selectedAssigneeId = null;
-				selectedRecurrence = '';
-				showMeta = false;
-				await tick();
-				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
-				textInputEl?.focus();
-			} catch {
-				if (!offlineQueue.online) {
-					enqueueForm(form);
-					form.reset();
-					inputText = '';
-					selectedAssigneeId = null;
-					selectedRecurrence = '';
-					showMeta = false;
-				} else {
-					toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
-				}
-			}
+			// Capture serialized body before form reset (for offline queue)
+			const serializedBody = new URLSearchParams(formData as unknown as Record<string, string>).toString();
+			const actionUrl = form.action;
+
+			// Fire the mutation without awaiting — form data is captured synchronously
+			submit().updates(
+				getItems().withOverride((items) => [...items, newItem])
+			).catch(() => {
+				if (!offlineQueue.online) offlineQueue.enqueue(actionUrl, serializedBody);
+				else toastService().show(new ToastMessage('Failed to add item', { type: 'error' }));
+			});
+
+			// Reset UI immediately
+			form.reset();
+			inputText = '';
+			selectedAssigneeId = null;
+			selectedRecurrence = '';
+			showMeta = false;
+			await tick();
+			requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+			textInputEl?.focus();
 		};
 	}
 </script>
