@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import type { RecurrenceInterval } from '$lib/recurrence';
 
@@ -26,7 +27,7 @@ class ListStore {
 
 	// Merge server items into store; keeps pending adds that haven't been confirmed yet
 	sync(listId: string, serverItems: ListItem[]): void {
-		const current = this.#lists.get(listId) ?? [];
+		const current = untrack(() => this.#lists.get(listId) ?? []);
 		for (const item of serverItems) this.#pendingAddIds.delete(item.id);
 		const stillPending = current.filter((i) => this.#pendingAddIds.has(i.id));
 		this.#lists.set(listId, [...serverItems, ...stillPending]);
