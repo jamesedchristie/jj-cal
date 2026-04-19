@@ -1,3 +1,4 @@
+import { SvelteMap } from 'svelte/reactivity';
 import type { RecurrenceInterval } from '$lib/recurrence';
 
 export type ListItem = {
@@ -15,7 +16,7 @@ export type ListItem = {
 };
 
 class ListStore {
-	#lists = $state<Map<string, ListItem[]>>(new Map());
+	#lists = new SvelteMap<string, ListItem[]>();
 	// IDs of items added optimistically, not yet confirmed by server
 	#pendingAddIds = new Set<string>();
 
