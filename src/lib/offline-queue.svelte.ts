@@ -18,6 +18,7 @@ function loadFromStorage(): QueuedWrite[] {
 
 class OfflineQueue {
 	#queue = $state<QueuedWrite[]>(loadFromStorage());
+	#drainCallbacks = new Set<() => void>();
 	online = $state(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
 	constructor() {
@@ -40,6 +41,12 @@ class OfflineQueue {
 		this.#save();
 	}
 
+	/** Register a callback that fires when a drain attempt completes with no failures. */
+	onDrained(cb: () => void): () => void {
+		this.#drainCallbacks.add(cb);
+		return () => this.#drainCallbacks.delete(cb);
+	}
+
 	async drain(): Promise<void> {
 		if (this.#queue.length === 0) return;
 		const toProcess = [...this.#queue];
@@ -58,6 +65,9 @@ class OfflineQueue {
 		}
 		this.#queue = failed;
 		this.#save();
+		if (failed.length === 0) {
+			this.#drainCallbacks.forEach((cb) => cb());
+		}
 	}
 
 	#save() {
