@@ -70,6 +70,7 @@ export const addItemToPrimaryList = form(
 
 export const addItem = form(
 	v.object({
+		id: v.pipe(v.optional(v.string(), ''), v.transform((s) => s || null)),
 		list_id: v.pipe(v.string(), v.nonEmpty()),
 		text: v.pipe(v.string(), v.nonEmpty()),
 		due_date: v.pipe(
@@ -82,10 +83,11 @@ export const addItem = form(
 		),
 		recurrence_interval: recurrenceField
 	}),
-	async ({ list_id, text, due_date, assigned_to_id, recurrence_interval }) => {
+	async ({ id, list_id, text, due_date, assigned_to_id, recurrence_interval }) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await createListItem(locals.db, {
+			id: id ?? undefined,
 			listId: list_id,
 			text: text.trim(),
 			createdById: locals.user.id,

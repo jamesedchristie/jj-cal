@@ -39,13 +39,15 @@ export default defineConfig({
 						}
 					},
 					{
-						// Same-origin GET requests (RPC queries, etc.): serve cached immediately,
-						// update in background so the app works offline with recent data
+						// Same-origin GET requests (RPC queries, etc.): try network first so we
+						// don't show stale data after a mutation; fall back to cache on patchy
+						// or offline networks after a short timeout.
 						urlPattern: ({ sameOrigin, request }: { sameOrigin: boolean; request: Request }) =>
 							sameOrigin && request.method === 'GET',
-						handler: 'StaleWhileRevalidate' as const,
+						handler: 'NetworkFirst' as const,
 						options: {
 							cacheName: 'api-get',
+							networkTimeoutSeconds: 3,
 							expiration: { maxEntries: 64, maxAgeSeconds: 86400 }
 						}
 					}

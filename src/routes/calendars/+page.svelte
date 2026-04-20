@@ -1,26 +1,16 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Button from '$lib/components/Button.svelte';
 	import Textarea from '$lib/components/Textarea.svelte';
 	import Toast from '$lib/components/toast/Toast.svelte';
-	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+	import { enqueueOrSubmit } from '$lib/offline-queue.svelte';
 	import type { EventRecurrenceRule } from '$lib/server/db/schema';
 	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { SvelteSet } from 'svelte/reactivity';
-	import {
-		addEventToDate,
-		createNewCalendar,
-		editEvent,
-		getCalendars,
-		loadEvents,
-		removeFutureEvents,
-		removeEvent
-	} from './data.remote';
+	import { createCalendarStore } from './calendar-store.svelte';
+	import { createNewCalendar, getCalendars } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 	import MonthGrid from './MonthGrid.svelte';
-
-	const toastService = getToastService();
 
 	const today = new Date();
 	const todayY = today.getFullYear();
@@ -32,6 +22,8 @@
 		const d = new Date(todayY, todayM - 1 + (i - 2));
 		return { year: d.getFullYear(), month: d.getMonth() + 1 };
 	});
+
+	const store = createCalendarStore(months);
 
 	// ---- Calendars & filters ----
 	let calendars = $derived(await getCalendars());
@@ -116,73 +108,38 @@
 	}
 
 	// ---- Mutations ----
-	async function createEvent(date: Date, text: string) {
-		const y = date.getFullYear();
-		const m = date.getMonth() + 1;
-		const rule = newEventRepeat || null;
-		const newEvent: ConstructorParameters<typeof CalendarEvent>[0] = {
-			id: Infinity,
-			calendar_id: effectiveCalendarId,
-			calendar_slug: '',
-			calendar_name: calendars.find((c) => c.id === effectiveCalendarId)?.name ?? '',
-			calendar_colour: calendars.find((c) => c.id === effectiveCalendarId)?.colour ?? null,
-			datetime: date.getTime(),
-			text,
-			created_by_name: '',
-			created_by_id: '',
-			isRecurring: !!rule,
-			recurrenceGroupId: null
-		};
-		await addEventToDate({
+	function createEvent(date: Date, text: string) {
+		const cal = calendars.find((c) => c.id === effectiveCalendarId);
+		store.addEvent({
 			calendarId: effectiveCalendarId,
-			year: y,
-			month: m,
+			calendarName: cal?.name ?? '',
+			calendarColour: cal?.colour ?? null,
+			year: date.getFullYear(),
+			month: date.getMonth() + 1,
 			date: date.getDate(),
 			text,
-			recurrenceRule: rule,
+			recurrenceRule: newEventRepeat || null,
 			recurrenceEndsOn: newEventEndsOn || null
-		}).updates(loadEvents({ year: y, month: m }).withOverride((events) => [...events, newEvent]));
+		});
 		newEventRepeat = '';
 		newEventEndsOn = '';
-		toastService().show(new ToastMessage('Event created!'));
 	}
 
-	async function editEventText(event: CalendarEvent, text: string) {
+	function editEventText(event: CalendarEvent, text: string) {
 		if (!text.trim()) {
-			await deleteThisEvent(event);
+			deleteThisEvent(event);
 			return;
 		}
-		const y = new Date(event.datetime).getFullYear();
-		const m = new Date(event.datetime).getMonth() + 1;
-		await editEvent({ id: event.id, text }).updates(
-			loadEvents({ year: y, month: m }).withOverride((events) =>
-				events.map((e) => (e.id === event.id ? { ...e, text } : e))
-			)
-		);
+		store.editEvent(event.id, event.datetime, text);
 	}
 
-	async function deleteThisEvent(event: CalendarEvent) {
-		const y = new Date(event.datetime).getFullYear();
-		const m = new Date(event.datetime).getMonth() + 1;
-		await removeEvent({ id: event.id }).updates(
-			loadEvents({ year: y, month: m }).withOverride((events) => events.filter((e) => e.id !== event.id))
-		);
+	function deleteThisEvent(event: CalendarEvent) {
+		store.removeEvent(event.id, event.datetime);
 	}
 
-	async function deleteThisAndFuture(event: CalendarEvent) {
+	function deleteThisAndFuture(event: CalendarEvent) {
 		if (!event.recurrenceGroupId) return;
-		const y = new Date(event.datetime).getFullYear();
-		const m = new Date(event.datetime).getMonth() + 1;
-		await removeFutureEvents({
-			recurrenceGroupId: event.recurrenceGroupId,
-			fromDatetime: event.datetime
-		}).updates(
-			loadEvents({ year: y, month: m }).withOverride((events) =>
-				events.filter(
-					(e) => !(e.recurrenceGroupId === event.recurrenceGroupId && e.datetime >= event.datetime)
-				)
-			)
-		);
+		store.removeFutureEvents(event.recurrenceGroupId, event.datetime);
 	}
 </script>
 
@@ -211,7 +168,7 @@
 
 	{#if showCreateCalendar}
 		<section class="create-calendar">
-			<form {...createNewCalendar}>
+			<form {...createNewCalendar.enhance(({ form, submit }) => enqueueOrSubmit(form, submit))}>
 				<input type="hidden" name="slug" value={newCalSlug} />
 				<input name="name" type="text" placeholder="Calendar name" bind:value={newCalName} required />
 				<Button type="submit">Create</Button>

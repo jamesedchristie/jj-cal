@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { getLists, newList, reorderListsCmd } from './data.remote';
+	import { newList, reorderListsCmd } from './data.remote';
 	import type { ListType } from '$lib/server/db/schema';
-	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
 	import { sortable } from '$lib/sortable';
 	import { tick } from 'svelte';
+	import { createListsStore } from './lists-store.svelte';
 
-	const toastService = getToastService();
-
-	const lists = $derived(await getLists());
-	const taskLists = $derived(lists.filter((l) => l.type === 'todo'));
-	const otherLists = $derived(lists.filter((l) => l.type !== 'todo'));
+	const store = createListsStore();
+	const taskLists = $derived(store.taskLists);
+	const otherLists = $derived(store.otherLists);
+	const lists = $derived(store.lists);
 
 	let showForm = $state(false);
 	let selectedType = $state<ListType>('shopping');
+	let newListId = $state(crypto.randomUUID());
 	let reorderFormEl = $state<HTMLFormElement>();
 	let reorderIds = $state('');
 	let taskListEl = $state<HTMLUListElement>();
@@ -63,18 +63,19 @@
 
 	{#if showForm}
 		<form
-			{...newList.enhance(async ({ form, submit }) => {
-				const ok = await submit();
-				if (ok) {
-					form.reset();
-					showForm = false;
-					selectedType = 'shopping';
-				} else {
-					toastService().show(new ToastMessage('Failed to create list', { type: 'error' }));
-				}
+			{...newList.enhance((ctx) => {
+				const nameInput = ctx.form.elements.namedItem('name') as HTMLInputElement | null;
+				const name = nameInput?.value.trim() ?? '';
+				if (!name) return;
+				store.newListHandler({ id: newListId, name, type: selectedType })(ctx);
+				ctx.form.reset();
+				showForm = false;
+				selectedType = 'shopping';
+				newListId = crypto.randomUUID();
 			})}
 			class="new-form"
 		>
+			<input type="hidden" name="id" value={newListId} />
 			<input
 				{...newList.fields.name.as('text')}
 				placeholder="List name…"
@@ -105,7 +106,9 @@
 
 	<form
 		bind:this={reorderFormEl}
-		{...reorderListsCmd.enhance(async ({ submit }) => { await submit(); })}
+		{...reorderListsCmd.enhance((ctx) =>
+			store.reorderHandler()({ ...ctx, data: { ids: reorderIds } })
+		)}
 		style="display:none"
 	>
 		<input type="hidden" name="ids" value={reorderIds} />

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
+	import { enqueueOrSubmit } from '$lib/offline-queue.svelte';
 	import { addShare, getList, getShareableUsers, getShares, removeShare, updateShare } from './data.remote';
 	import type { Permission } from '$lib/server/db/schema';
 	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
@@ -49,9 +50,13 @@
 			</li>
 
 			{#each shares as share (share.shareId)}
-				{@const toggle = updateShare.for(share.shareId)}
-				{@const del = removeShare.for(share.shareId)}
-				<li class="member-row" class:pending={!!toggle.pending || !!del.pending}>
+				{@const toggleFor = updateShare.for(share.shareId)}
+				{@const delFor = removeShare.for(share.shareId)}
+				{@const toggle = toggleFor.enhance(({ form, submit }) =>
+					enqueueOrSubmit(form, submit)
+				)}
+				{@const del = delFor.enhance(({ form, submit }) => enqueueOrSubmit(form, submit))}
+				<li class="member-row">
 					<div class="member-info">
 						<UserAvatar
 							name={share.name}
@@ -65,7 +70,7 @@
 					<div class="member-actions">
 						{#if isOwner}
 							<form {...toggle}>
-								<input {...toggle.fields.share_id.as('hidden', share.shareId)} />
+								<input {...toggleFor.fields.share_id.as('hidden', share.shareId)} />
 								<select
 									name="permission"
 									onchange={(e) => {
@@ -78,7 +83,7 @@
 								</select>
 							</form>
 							<form {...del}>
-								<input {...del.fields.share_id.as('hidden', share.shareId)} />
+								<input {...delFor.fields.share_id.as('hidden', share.shareId)} />
 								<button type="submit" class="remove-btn" aria-label="Remove access">
 									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 										<line x1="18" y1="6" x2="6" y2="18"/>
@@ -105,7 +110,7 @@
 
 			<form
 				{...addShare.enhance(async ({ form, submit }) => {
-					const ok = await submit();
+					const ok = await enqueueOrSubmit(form, submit);
 					if (ok) {
 						form.reset();
 						selectedUserId = null;
@@ -251,11 +256,6 @@
 		gap: var(--space-3);
 		padding: var(--space-2) var(--space-1);
 		border-radius: var(--radius-md);
-		transition: opacity var(--duration-fast) var(--ease-standard);
-
-		&.pending {
-			opacity: 0.4;
-		}
 	}
 
 	.member-info {

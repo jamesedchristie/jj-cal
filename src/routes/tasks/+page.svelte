@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
-	import { INTERVAL_LABELS, isEffectivelyComplete, RECURRENCE_INTERVALS } from '$lib/recurrence';
-	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
+	import { INTERVAL_LABELS, RECURRENCE_INTERVALS } from '$lib/recurrence';
 	import {
 		addItem,
 		editItem,
-		getTaskItems,
 		getTodoLists,
 		getUsers,
 		removeItem,
@@ -14,19 +12,16 @@
 		toggleItem
 	} from './data.remote';
 	import { sortable } from '$lib/sortable';
-
-	const toastService = getToastService();
+	import { createTasksStore } from './tasks-store.svelte';
 
 	// 'mine' = tasks assigned to me or unassigned ones I created
 	// 'all'  = every task in every accessible todo list
 	let viewMode = $state<'mine' | 'all'>('mine');
 
-	const allItems = $derived(await getTaskItems(viewMode));
-	const incomplete = $derived(allItems.filter((t) => !isEffectivelyComplete(t)));
-	const complete = $derived(allItems.filter((t) => isEffectivelyComplete(t)));
-	const oneDayAgo = $derived(Date.now() - 24 * 60 * 60 * 1000);
-	const recentlyCompleted = $derived(complete.filter((t) => t.completedAt && t.completedAt.getTime() > oneDayAgo));
-	const archivedCompleted = $derived(complete.filter((t) => !t.completedAt || t.completedAt.getTime() <= oneDayAgo));
+	const store = createTasksStore(() => viewMode);
+	const incomplete = $derived(store.incomplete);
+	const recentlyCompleted = $derived(store.recentlyCompleted);
+	const archivedCompleted = $derived(store.archivedCompleted);
 
 	const todoLists = $derived(await getTodoLists());
 	const users = $derived(await getUsers());
@@ -34,6 +29,8 @@
 	// Default add-form target: the user's first owned list (or first accessible)
 	let selectedListId = $state<string | null>(null);
 	let effectiveListId = $derived(selectedListId ?? todoLists[0]?.id ?? '');
+	let effectiveListName = $derived(todoLists.find((l) => l.id === effectiveListId)?.name ?? '');
+	let newItemId = $state(crypto.randomUUID());
 
 	// Today's date in Sydney time as YYYY-MM-DD
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(
@@ -98,7 +95,9 @@
 
 	<form
 		bind:this={reorderFormEl}
-		{...reorderItems.enhance(async ({ submit }) => { await submit(); })}
+		{...reorderItems.enhance((ctx) =>
+			store.reorderHandler()({ ...ctx, data: { ids: reorderIds } })
+		)}
 		style="display:none"
 	>
 		<input type="hidden" name="ids" value={reorderIds} />
@@ -107,17 +106,15 @@
 	<div class="scroll-area">
 	<ul class="todo-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder })}>
 		{#each incomplete as item (item.id)}
-			{@const toggle = toggleItem.for(item.id)}
-			{@const remove = removeItem.for(item.id)}
 			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
 			{@const assignee = userById(item.assignedToId ?? null)}
-			<li data-id={item.id} class:pending={!!toggle.pending || !!remove.pending} class:overdue={status === 'overdue'}>
+			<li data-id={item.id} class:overdue={status === 'overdue'}>
 				<span class="drag-handle" aria-hidden="true">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
 				</span>
-				<form {...toggle}>
-					<input {...toggle.fields.id.as('hidden', item.id)} />
-					<input {...toggle.fields.completed.as('hidden', 'true')} />
+				<form {...toggleItem.enhance(store.toggleHandler(item.id, true))}>
+					<input {...toggleItem.fields.id.as('hidden', item.id)} />
+					<input {...toggleItem.fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -134,19 +131,20 @@
 					</button>
 				</form>
 				{#if editingId === item.id}
-					{@const edit = editItem.for(item.id)}
 					<form
-						{...edit.enhance(async ({ submit }) => {
-							const ok = await submit();
-							if (ok) editingId = null;
-							else toastService().show(new ToastMessage('Failed to save', { type: 'error' }));
+						{...editItem.enhance((ctx) => {
+							const input = ctx.form.elements.namedItem('text') as HTMLInputElement | null;
+							const newText = input?.value.trim() ?? '';
+							if (!newText || newText === item.text) { editingId = null; return; }
+							store.editHandler(item.id, newText)(ctx);
+							editingId = null;
 						})}
 						class="text-edit-form"
 					>
-						<input {...edit.fields.id.as('hidden', item.id)} />
+						<input {...editItem.fields.id.as('hidden', item.id)} />
 						<input
 							bind:this={editInputEl}
-							{...edit.fields.text.as('text')}
+							{...editItem.fields.text.as('text')}
 							value={item.text}
 							class="text-edit"
 							autocapitalize="sentences"
@@ -186,8 +184,8 @@
 						/>
 					</span>
 				{/if}
-				<form {...remove}>
-					<input {...remove.fields.id.as('hidden', item.id)} />
+				<form {...removeItem.enhance(store.removeHandler(item.id))}>
+					<input {...removeItem.fields.id.as('hidden', item.id)} />
 					<button type="submit" class="delete" aria-label="Delete task">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -213,13 +211,11 @@
 			<summary>{recentlyCompleted.length} completed</summary>
 			<ul class="todo-list completed">
 				{#each recentlyCompleted as item (item.id)}
-					{@const toggle = toggleItem.for(`uncomplete-${item.id}`)}
-					{@const remove = removeItem.for(`done-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
-							<input {...toggle.fields.id.as('hidden', item.id)} />
-							<input {...toggle.fields.completed.as('hidden', 'false')} />
+						<form {...toggleItem.enhance(store.toggleHandler(item.id, false))}>
+							<input {...toggleItem.fields.id.as('hidden', item.id)} />
+							<input {...toggleItem.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
@@ -232,8 +228,8 @@
 								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 							</span>
 						{/if}
-						<form {...remove}>
-							<input {...remove.fields.id.as('hidden', item.id)} />
+						<form {...removeItem.enhance(store.removeHandler(item.id))}>
+							<input {...removeItem.fields.id.as('hidden', item.id)} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -251,13 +247,11 @@
 			<summary>{archivedCompleted.length} archived</summary>
 			<ul class="todo-list completed">
 				{#each archivedCompleted as item (item.id)}
-					{@const toggle = toggleItem.for(`unarchive-${item.id}`)}
-					{@const remove = removeItem.for(`archive-${item.id}`)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggle}>
-							<input {...toggle.fields.id.as('hidden', item.id)} />
-							<input {...toggle.fields.completed.as('hidden', 'false')} />
+						<form {...toggleItem.enhance(store.toggleHandler(item.id, false))}>
+							<input {...toggleItem.fields.id.as('hidden', item.id)} />
+							<input {...toggleItem.fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
@@ -270,8 +264,8 @@
 								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 							</span>
 						{/if}
-						<form {...remove}>
-							<input {...remove.fields.id.as('hidden', item.id)} />
+						<form {...removeItem.enhance(store.removeHandler(item.id))}>
+							<input {...removeItem.fields.id.as('hidden', item.id)} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -286,22 +280,33 @@
 	</div>
 
 	<form
-		{...addItem.enhance(async ({ form, submit }) => {
-			const ok = await submit();
-			if (ok) {
-				form.reset();
-				selectedAssigneeId = null;
-				selectedRecurrence = '';
-				showMeta = false;
-				await tick();
+		{...addItem.enhance((ctx) => {
+			const textInput = ctx.form.elements.namedItem('text') as HTMLInputElement | null;
+			const dueInput = ctx.form.elements.namedItem('due_date') as HTMLInputElement | null;
+			const text = textInput?.value.trim() ?? '';
+			if (!text) return;
+			store.addHandler({
+				id: newItemId,
+				listId: effectiveListId,
+				listName: effectiveListName,
+				text,
+				dueDate: dueInput?.value || null,
+				assignedToId: selectedAssigneeId,
+				recurrenceInterval: (selectedRecurrence || null) as any
+			})(ctx);
+			ctx.form.reset();
+			selectedAssigneeId = null;
+			selectedRecurrence = '';
+			showMeta = false;
+			newItemId = crypto.randomUUID();
+			tick().then(() => {
 				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
 				textInputEl?.focus();
-			} else {
-				toastService().show(new ToastMessage('Failed to add task', { type: 'error' }));
-			}
+			});
 		})}
 		class="add-form"
 	>
+		<input type="hidden" name="id" value={newItemId} />
 		<input {...addItem.fields.list_id.as('hidden', effectiveListId)} />
 		<div class="add-row">
 			<input
@@ -703,11 +708,6 @@
 			gap: var(--space-2);
 			padding: var(--space-2);
 			border-radius: var(--radius-md);
-			transition: opacity var(--duration-fast) var(--ease-standard);
-
-			&.pending {
-				opacity: 0.4;
-			}
 		}
 	}
 

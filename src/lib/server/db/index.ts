@@ -10,10 +10,10 @@ export function getDb(db?: D1Database, databaseUrl?: string) {
 
 	if (databaseUrl) {
 		const client = createClient({ url: databaseUrl });
-		return drizzleLibSql(client, { schema });
+		return drizzleLibSql(client, { schema }) as unknown as ReturnType<typeof drizzleD1>;
 	}
 
 	throw new Error('No database configuration found');
 }
 
-export type DrizzleClient = ReturnType<typeof getDb>;
+export type DrizzleClient = ReturnType<typeof drizzleD1>;

@@ -21,6 +21,7 @@ export const reorderListsCmd = form(
 
 export const newList = form(
 	v.object({
+		id: v.pipe(v.optional(v.string(), ''), v.transform((s) => s || null)),
 		name: v.pipe(v.string(), v.nonEmpty()),
 		type: v.pipe(
 			v.string(),
@@ -28,11 +29,11 @@ export const newList = form(
 			v.transform((v) => v as ListType)
 		)
 	}),
-	async ({ name, type }) => {
+	async ({ id, name, type }) => {
 		const { locals } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
 		await createList(locals.db, {
-			id: crypto.randomUUID(),
+			id: id ?? crypto.randomUUID(),
 			name: name.trim(),
 			type,
 			createdById: locals.user.id
