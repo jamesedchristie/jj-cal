@@ -1,6 +1,6 @@
 import type { RemoteQueryUpdate } from '@sveltejs/kit';
 import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
-import { offlineQueue } from '$lib/offline-queue.svelte';
+import { encodeForm, offlineQueue } from '$lib/offline-queue.svelte';
 import { isEffectivelyComplete, type RecurrenceInterval } from '$lib/recurrence';
 import { getItems } from './data.remote';
 
@@ -33,10 +33,6 @@ type AddInput = {
 	assignedToId: string | null;
 	recurrenceInterval: RecurrenceInterval | null;
 };
-
-function encodeForm(form: HTMLFormElement): string {
-	return new URLSearchParams(new FormData(form) as unknown as Record<string, string>).toString();
-}
 
 export function createListStore(listId: string) {
 	const toast = getToastService();
