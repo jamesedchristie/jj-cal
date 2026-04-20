@@ -23,7 +23,7 @@ const recurrenceField = v.pipe(
 export const getList = query(async () => {
 	const { locals, params } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
-	const list = await getListWithAccess(locals.db, params.listId, locals.user.id);
+	const list = await getListWithAccess(locals.db, params.listId!, locals.user.id);
 	if (!list) error(404, 'List not found');
 	return list;
 });
@@ -32,9 +32,9 @@ export const getItems = query(async () => {
 	const { locals, params } = getRequestEvent();
 	if (!locals.user) throw 'Not authenticated';
 	// Verify access before returning items
-	const access = await getListAccess(locals.db, params.listId, locals.user.id);
+	const access = await getListAccess(locals.db, params.listId!, locals.user.id);
 	if (!access) error(403, 'Access denied');
-	return getListItems(locals.db, params.listId);
+	return getListItems(locals.db, params.listId!);
 });
 
 export const getUsers = query(async () => {
@@ -95,8 +95,8 @@ export const renameList = form(
 	async ({ name }) => {
 		const { locals, params } = getRequestEvent();
 		if (!locals.user) throw 'Not authenticated';
-		await requireEditor(locals.db, params.listId, locals.user.id);
-		await updateListName(locals.db, params.listId, name.trim());
+		await requireEditor(locals.db, params.listId!, locals.user.id);
+		await updateListName(locals.db, params.listId!, name.trim());
 		void getList().refresh();
 	}
 );
