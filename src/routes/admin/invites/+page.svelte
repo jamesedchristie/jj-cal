@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
+	import { enqueueOrSubmit } from '$lib/offline-queue.svelte';
 	import { generateInvite, getInvites, revokeInviteAction } from './data.remote';
 
 	const inviteList = $derived(await getInvites());
@@ -56,11 +57,7 @@
 		Links expire after 7 days.
 	</p>
 
-	<form
-		{...generateInvite.enhance(async ({ submit }) => {
-			await submit();
-		})}
-	>
+	<form {...generateInvite.enhance(({ form, submit }) => enqueueOrSubmit(form, submit))}>
 		<Button type="submit">Generate invite link</Button>
 	</form>
 
@@ -88,9 +85,9 @@
 							<Button onclick={() => copyLink(invite.token)}>Copy link</Button>
 							<Button onclick={() => (qrToken = invite.token)}>QR code</Button>
 							<form
-								{...revokeInviteAction.enhance(async ({ submit }) => {
-									await submit();
-								})}
+								{...revokeInviteAction.enhance(({ form, submit }) =>
+									enqueueOrSubmit(form, submit)
+								)}
 							>
 								<input {...revokeInviteAction.fields.id.as('hidden', invite.id)} />
 								<Button type="submit">Revoke</Button>
