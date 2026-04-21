@@ -117,6 +117,27 @@ export function createBudgetStore() {
 			});
 		},
 
+		surplusData(from: string, to: string, period: 'weekly' | 'monthly') {
+			const periodNet        = toPeriodCents(monthlyIncome - monthlyOutgoings, 'monthly', period);
+			const periodAllocs     = toPeriodCents(monthlyAllocations, 'monthly', period);
+			const periodSavings    = toPeriodCents(monthlySavings, 'monthly', period);
+			if (periodNet <= 0) return null;
+
+			const spent     = allExpenses.filter(e => e.date >= from && e.date <= to).reduce((s, e) => s + e.amount, 0);
+			const remaining = periodNet - spent;
+
+			const remainingPct     = Math.max(0, Math.min(remaining / periodNet, 1)) * 100;
+			// Markers are absolute positions from left (0 = nothing left, 100 = nothing spent)
+			const allocationLinePct = Math.max(0, Math.min((periodNet - periodAllocs) / periodNet, 1)) * 100;
+			const savingsLinePct    = Math.max(0, Math.min(periodSavings / periodNet, 1)) * 100;
+
+			const status: 'good' | 'warning' | 'danger' =
+				remaining <= periodSavings            ? 'danger'  :
+				remaining <= periodNet - periodAllocs ? 'warning' : 'good';
+
+			return { max: periodNet, remaining, spent, remainingPct, allocationLinePct, savingsLinePct, periodAllocs, periodSavings, status };
+		},
+
 		editItemHandler(itemId: string, updates: { name: string; amount: number; frequency: BudgetFrequency }) {
 			return (ctx: EnhanceArgs) => {
 				const override = getBudgetItems().withOverride((items) =>
