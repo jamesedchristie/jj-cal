@@ -26,6 +26,18 @@
 
 	setToastService(() => toastService);
 
+	// Hide bottom nav while virtual keyboard is open
+	let keyboardOpen = $state(false);
+	$effect(() => {
+		const vv = window.visualViewport;
+		if (!vv) return;
+		function update() {
+			keyboardOpen = (vv!.height) < window.innerHeight - 100;
+		}
+		vv.addEventListener('resize', update);
+		return () => vv.removeEventListener('resize', update);
+	});
+
 	const webManifestLink = pwaInfo?.webManifest.linkTag ?? '';
 
 	async function handleLogout(e: SubmitEvent) {
@@ -82,7 +94,7 @@
 	<main>
 		{@render children?.()}
 	</main>
-	{#if data.user}
+	{#if data.user && !keyboardOpen}
 		<!-- <FAB /> -->
 		<BottomNav />
 	{/if}

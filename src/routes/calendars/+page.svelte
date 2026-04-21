@@ -4,8 +4,9 @@
 	import { enqueueOrSubmit } from '$lib/offline-queue.svelte';
 	import type { EventRecurrenceRule } from '$lib/server/db/schema';
 	import { flip } from 'svelte/animate';
+	import { cubicOut } from 'svelte/easing';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { slide } from 'svelte/transition';
+	import { fade, fly, slide } from 'svelte/transition';
 	import { createCalendarStore } from './calendar-store.svelte';
 	import { createNewCalendar, getCalendars, loadEvents } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
@@ -132,6 +133,24 @@
 	let showCreateCalendar = $state(false);
 	let showAddForm = $state(false);
 	let newCalName = $state('');
+
+	// Track keyboard height so the bottom sheet can float above it
+	let keyboardOffset = $state(0);
+	$effect(() => {
+		if (!showAddForm) { keyboardOffset = 0; return; }
+		const vv = window.visualViewport;
+		if (!vv) return;
+		function update() {
+			keyboardOffset = Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop);
+		}
+		vv.addEventListener('resize', update);
+		vv.addEventListener('scroll', update);
+		update();
+		return () => {
+			vv!.removeEventListener('resize', update);
+			vv!.removeEventListener('scroll', update);
+		};
+	});
 	let newCalSlug = $derived(
 		newCalName
 			.toLowerCase()
@@ -333,81 +352,93 @@
 				</section>
 
 				<section class="new-event">
-					{#if showAddForm}
-						<div class="add-form">
-							<form
-								onsubmit={(e) => {
-									e.preventDefault();
-									if (editingText.trim()) createEvent(selectedDate, editingText);
-								}}
-							>
-								<!-- Row 1: event name -->
-								<!-- svelte-ignore a11y_autofocus -->
-								<input
-									class="add-text-input"
-									type="text"
-									placeholder="Event name…"
-									bind:value={editingText}
-									autofocus
-									onkeydown={(e) => {
-										if (e.key === 'Enter' && e.metaKey) {
-											e.preventDefault();
-											if (editingText.trim()) createEvent(selectedDate, editingText);
-										}
-										if (e.key === 'Escape') showAddForm = false;
-									}}
-								/>
-								<!-- Row 2: selects + optional ends -->
-								<div class="add-controls-row">
-									{#if calendars.length > 1}
-										<select class="inline-select cal-select" bind:value={newEventCalendarId}>
-											{#each calendars as cal (cal.id)}
-												<option value={cal.id}>{cal.name}</option>
-											{/each}
-										</select>
-									{/if}
-									<select class="inline-select" bind:value={newEventRepeat}>
-										<option value="">No repeat</option>
-										<option value="daily">Daily</option>
-										<option value="weekly">Weekly</option>
-										<option value="fortnightly">Fortnightly</option>
-										<option value="monthly">Monthly</option>
-										<option value="yearly">Yearly</option>
-									</select>
-									{#if newEventRepeat}
-										<div class="ends-inline" transition:slide={{ axis: 'x', duration: 150 }}>
-											<span class="ends-label">Ends</span>
-											<input type="date" class="ends-input" bind:value={newEventEndsOn} />
-										</div>
-									{/if}
-								</div>
-								<!-- Row 3: actions -->
-								<div class="add-actions-row">
-									<button type="button" class="add-cancel-btn" onclick={() => (showAddForm = false)}
-										>Cancel</button
-									>
-									<button
-										type="submit"
-										class="add-submit-btn"
-										disabled={!editingText.length || calendars.length === 0}>Add event</button
-									>
-								</div>
-							</form>
-						</div>
-					{:else}
-						<button
-							type="button"
-							class="add-trigger"
-							onclick={() => {
-								newEventCalendarId = selectedCalendarId;
-								showAddForm = true;
-							}}>+ Add event</button
-						>
-					{/if}
+					<button
+						type="button"
+						class="add-trigger"
+						onclick={() => {
+							newEventCalendarId = selectedCalendarId;
+							showAddForm = true;
+						}}>+ Add event</button
+					>
 				</section>
 			</div>
 		</div>
 	</div>
+
+	{#if showAddForm}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div
+			class="sheet-backdrop"
+			transition:fade={{ duration: 150 }}
+			onclick={() => (showAddForm = false)}
+		></div>
+		<div
+			class="add-sheet"
+			style="bottom: {keyboardOffset}px"
+			transition:fly={{ y: 400, duration: 300, easing: cubicOut }}
+		>
+			<div class="sheet-handle"></div>
+			<form
+				onsubmit={(e) => {
+					e.preventDefault();
+					if (editingText.trim()) createEvent(selectedDate, editingText);
+				}}
+			>
+				<p class="sheet-date">{formatSelectedDate(selectedDate)}</p>
+				<!-- Row 1: event name -->
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					class="add-text-input"
+					type="text"
+					placeholder="Event name…"
+					bind:value={editingText}
+					autofocus
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							if (editingText.trim()) createEvent(selectedDate, editingText);
+						}
+						if (e.key === 'Escape') showAddForm = false;
+					}}
+				/>
+				<!-- Row 2: selects + optional ends -->
+				<div class="add-controls-row">
+					{#if calendars.length > 1}
+						<select class="inline-select cal-select" bind:value={newEventCalendarId}>
+							{#each calendars as cal (cal.id)}
+								<option value={cal.id}>{cal.name}</option>
+							{/each}
+						</select>
+					{/if}
+					<select class="inline-select" bind:value={newEventRepeat}>
+						<option value="">No repeat</option>
+						<option value="daily">Daily</option>
+						<option value="weekly">Weekly</option>
+						<option value="fortnightly">Fortnightly</option>
+						<option value="monthly">Monthly</option>
+						<option value="yearly">Yearly</option>
+					</select>
+					{#if newEventRepeat}
+						<div class="ends-inline" transition:slide={{ axis: 'x', duration: 150 }}>
+							<span class="ends-label">Ends</span>
+							<input type="date" class="ends-input" bind:value={newEventEndsOn} />
+						</div>
+					{/if}
+				</div>
+				<!-- Row 3: actions -->
+				<div class="add-actions-row">
+					<button type="button" class="add-cancel-btn" onclick={() => (showAddForm = false)}
+						>Cancel</button
+					>
+					<button
+						type="submit"
+						class="add-submit-btn"
+						disabled={!editingText.length || calendars.length === 0}>Add event</button
+					>
+				</div>
+			</form>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -732,7 +763,7 @@
 		}
 	}
 
-	/* ---- Add event section ---- */
+	/* ---- Add event trigger ---- */
 	.new-event {
 		flex: none;
 		padding: var(--space-2) var(--space-3) var(--space-3);
@@ -758,14 +789,63 @@
 		}
 	}
 
-	.add-form {
-		width: 100%;
+	/* ---- Bottom sheet modal ---- */
+	.sheet-backdrop {
+		position: fixed;
+		inset: 0;
+		background: var(--color-overlay);
+		z-index: var(--z-overlay);
 	}
 
-	.add-form form {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
+	.add-sheet {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: var(--z-modal);
+		background: var(--color-surface);
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		box-shadow: var(--shadow-lg);
+		padding: var(--space-2) var(--space-4) var(--space-6);
+		padding-bottom: calc(var(--space-6) + var(--safe-bottom));
+
+		form {
+			display: flex;
+			flex-direction: column;
+			gap: var(--space-3);
+		}
+	}
+
+	.sheet-handle {
+		width: 36px;
+		height: 4px;
+		border-radius: var(--radius-full);
+		background: var(--color-border-strong);
+		margin: 0 auto var(--space-3);
+	}
+
+	.sheet-date {
+		font-size: var(--font-size-sm);
+		font-family: var(--font-heading);
+		font-weight: var(--font-weight-bold);
+		color: var(--color-text);
+	}
+
+	.add-text-input {
+		width: 100%;
+		font-size: var(--font-size-base);
+		font-family: var(--font-body);
+		color: var(--color-text);
+		background: var(--color-surface-sunken);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		padding: var(--space-3) var(--space-3);
+		outline: none;
+
+		&:focus {
+			border-color: var(--color-accent);
+			background: var(--color-surface);
+		}
 	}
 
 	.add-controls-row {
@@ -775,29 +855,6 @@
 		flex-wrap: wrap;
 	}
 
-	.add-actions-row {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
-		gap: var(--space-2);
-	}
-
-	.add-text-input {
-		width: 100%;
-		font-size: var(--font-size-sm);
-		font-family: var(--font-body);
-		color: var(--color-text);
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		padding: var(--space-1) var(--space-2);
-		outline: none;
-
-		&:focus {
-			border-color: var(--color-accent);
-		}
-	}
-
 	.inline-select {
 		font-size: var(--font-size-xs);
 		font-family: var(--font-body);
@@ -805,10 +862,10 @@
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-sm);
-		padding: var(--space-1) var(--space-1);
+		padding: var(--space-2) var(--space-1);
 		outline: none;
 		cursor: pointer;
-		max-width: 100px;
+		max-width: 120px;
 
 		&:focus {
 			border-color: var(--color-accent);
@@ -816,7 +873,7 @@
 	}
 
 	.cal-select {
-		max-width: 90px;
+		max-width: 110px;
 	}
 
 	.ends-inline {
@@ -824,46 +881,6 @@
 		align-items: center;
 		gap: var(--space-1);
 		overflow: hidden;
-	}
-
-	.add-submit-btn {
-		flex: none;
-		background: var(--color-primary);
-		color: var(--color-primary-text);
-		border: none;
-		border-radius: var(--radius-sm);
-		padding: var(--space-1) var(--space-6);
-		font-size: var(--font-size-sm);
-		font-family: var(--font-body);
-		font-weight: var(--font-weight-medium);
-		cursor: pointer;
-		transition: background var(--duration-fast) var(--ease-standard);
-
-		&:hover:not(:disabled) {
-			background: var(--color-primary-hover);
-		}
-
-		&:disabled {
-			opacity: 0.4;
-			cursor: not-allowed;
-		}
-	}
-
-	.add-cancel-btn {
-		flex: none;
-		background: none;
-		border: 1px solid var(--color-border);
-		padding: var(--space-1) var(--space-2);
-		font-size: var(--font-size-sm);
-		font-family: var(--font-body);
-		color: var(--color-text-muted);
-		cursor: pointer;
-		border-radius: var(--radius-sm);
-
-		&:hover {
-			color: var(--color-text);
-			border-color: var(--color-border-strong);
-		}
 	}
 
 	.ends-label {
@@ -885,6 +902,53 @@
 
 		&:focus {
 			border-color: var(--color-accent);
+		}
+	}
+
+	.add-actions-row {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: var(--space-2);
+	}
+
+	.add-submit-btn {
+		flex: none;
+		background: var(--color-primary);
+		color: var(--color-primary-text);
+		border: none;
+		border-radius: var(--radius-sm);
+		padding: var(--space-3) var(--space-6);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard);
+
+		&:hover:not(:disabled) {
+			background: var(--color-primary-hover);
+		}
+
+		&:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+	}
+
+	.add-cancel-btn {
+		flex: none;
+		background: none;
+		border: 1px solid var(--color-border);
+		padding: var(--space-3) var(--space-3);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+
+		&:hover {
+			color: var(--color-text);
+			border-color: var(--color-border-strong);
 		}
 	}
 </style>
