@@ -1,7 +1,15 @@
 <script lang="ts">
 	import type { BudgetFrequency, BudgetItemType } from '$lib/server/db/schema';
-	import { addBudgetItem, addExpense, editBudgetItem, getBudget, removeBudgetItem, removeExpense } from './data.remote';
+	import { SvelteDate, SvelteMap } from 'svelte/reactivity';
 	import { createBudgetStore, type BudgetItem, type Expense } from './budget-store.svelte';
+	import {
+		addBudgetItem,
+		addExpense,
+		editBudgetItem,
+		getBudget,
+		removeBudgetItem,
+		removeExpense
+	} from './data.remote';
 
 	const store = createBudgetStore();
 	const budget = $derived(getBudget().current);
@@ -32,12 +40,12 @@
 	function generateMonths(count: number): PeriodOption[] {
 		const now = new Date();
 		return Array.from({ length: count }, (_, i) => {
-			const d    = new Date(now.getFullYear(), now.getMonth() - i, 1);
+			const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
 			const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
 			return {
 				label: d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
-				from:  isoDate(d),
-				to:    isoDate(last)
+				from: isoDate(d),
+				to: isoDate(last)
 			};
 		});
 	}
@@ -45,12 +53,12 @@
 	function generateWeeks(count: number): PeriodOption[] {
 		const now = new Date();
 		const daysToMon = now.getDay() === 0 ? 6 : now.getDay() - 1;
-		const thisMon = new Date(now);
+		const thisMon = new SvelteDate(now);
 		thisMon.setDate(now.getDate() - daysToMon);
 		return Array.from({ length: count }, (_, i) => {
-			const mon = new Date(thisMon);
+			const mon = new SvelteDate(thisMon);
 			mon.setDate(thisMon.getDate() - i * 7);
-			const sun = new Date(mon);
+			const sun = new SvelteDate(mon);
 			sun.setDate(mon.getDate() + 6);
 			const short = (d: Date) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 			return { from: isoDate(mon), to: isoDate(sun), label: `${short(mon)} – ${short(sun)}` };
@@ -58,12 +66,12 @@
 	}
 
 	const MONTHS = generateMonths(6);
-	const WEEKS  = generateWeeks(16);
+	const WEEKS = generateWeeks(16);
 
 	// --- Log state ---
 	// monthFrom drives the period when weekFrom is empty
 	let monthFrom = $state(MONTHS[0].from);
-	let weekFrom  = $state('');
+	let weekFrom = $state('');
 	let expDesc = $state('');
 	let expAmount = $state('');
 	let expDate = $state(todaySydney());
@@ -77,9 +85,7 @@
 			? (WEEKS.find((w) => w.from === weekFrom) ?? WEEKS[0])
 			: (MONTHS.find((m) => m.from === monthFrom) ?? MONTHS[0])
 	);
-	const surplus = $derived(
-		store.surplusData(periodRange.from, periodRange.to, activePeriodType)
-	);
+	const surplus = $derived(store.surplusData(periodRange.from, periodRange.to, activePeriodType));
 	const categoryProgress = $derived(
 		store.categoryProgress(periodRange.from, periodRange.to, activePeriodType)
 	);
@@ -88,7 +94,7 @@
 
 	const groupedExpenses = $derived(
 		(() => {
-			const groups = new Map<string, Expense[]>();
+			const groups = new SvelteMap<string, Expense[]>();
 			for (const e of periodExpenses) {
 				if (!groups.has(e.date)) groups.set(e.date, []);
 				groups.get(e.date)!.push(e);
@@ -131,17 +137,24 @@
 	};
 
 	const SECTIONS: { type: BudgetItemType; title: string; empty: string }[] = [
-		{ type: 'incoming',   title: 'Income',               empty: 'No income added yet' },
-		{ type: 'outgoing',   title: 'Fixed outgoings',      empty: 'No fixed outgoings added yet' },
-		{ type: 'allocation', title: 'Spending allocations', empty: 'No allocations added yet — add one to track spending categories' },
-		{ type: 'savings',    title: 'Savings target',       empty: 'No savings target set' }
+		{ type: 'incoming', title: 'Income', empty: 'No income added yet' },
+		{ type: 'outgoing', title: 'Fixed outgoings', empty: 'No fixed outgoings added yet' },
+		{
+			type: 'allocation',
+			title: 'Spending allocations',
+			empty: 'No allocations added yet — add one to track spending categories'
+		},
+		{ type: 'savings', title: 'Savings target', empty: 'No savings target set' }
 	];
 
 	function sectionItems(type: BudgetItemType): BudgetItem[] {
-		return type === 'incoming'   ? store.incomings
-			 : type === 'outgoing'   ? store.outgoings
-			 : type === 'allocation' ? store.allocations
-			 : store.savings;
+		return type === 'incoming'
+			? store.incomings
+			: type === 'outgoing'
+				? store.outgoings
+				: type === 'allocation'
+					? store.allocations
+					: store.savings;
 	}
 
 	function toggleSection(type: BudgetItemType) {
@@ -178,14 +191,14 @@
 				type="button"
 				class="tab-btn"
 				class:active={view === 'plan'}
-				onclick={() => view = 'plan'}
-			>Plan</button>
+				onclick={() => (view = 'plan')}>Plan</button
+			>
 			<button
 				type="button"
 				class="tab-btn"
 				class:active={view === 'log'}
-				onclick={() => view = 'log'}
-			>Log</button>
+				onclick={() => (view = 'log')}>Log</button
+			>
 		</div>
 	</header>
 
@@ -224,7 +237,11 @@
 						<div class="summary-divider"></div>
 						<div class="summary-row net">
 							<span>Net</span>
-							<span class="amount" class:income={store.monthlyNet >= 0} class:danger={store.monthlyNet < 0}>
+							<span
+								class="amount"
+								class:income={store.monthlyNet >= 0}
+								class:danger={store.monthlyNet < 0}
+							>
 								{store.monthlyNet >= 0 ? '' : '−'}{fmt(Math.abs(store.monthlyNet))}
 							</span>
 						</div>
@@ -233,7 +250,7 @@
 			{/if}
 
 			<!-- Plan sections -->
-			{#each SECTIONS as { type, title, empty }}
+			{#each SECTIONS as { type, title, empty } (title)}
 				{@const items = sectionItems(type)}
 				<section class="plan-section">
 					<div class="section-header">
@@ -242,8 +259,8 @@
 							type="button"
 							class="add-btn"
 							aria-label="Add {title}"
-							onclick={() => toggleSection(type)}
-						>{addingSection === type ? '×' : '+'}</button>
+							onclick={() => toggleSection(type)}>{addingSection === type ? '×' : '+'}</button
+						>
 					</div>
 
 					{#if items.length === 0 && addingSection !== type}
@@ -252,17 +269,18 @@
 						<ul class="item-list">
 							{#each items as item (item.id)}
 								{#if editingItemId === item.id}
-									{@const editForm   = editBudgetItem.for(item.id)}
+									{@const editForm = editBudgetItem.for(item.id)}
 									{@const deleteForm = removeBudgetItem.for(item.id)}
 									<li class="item-edit">
 										<form
-											action={editForm.action}
 											{...editForm.enhance((ctx) => {
 												const name = editName.trim();
 												const dollars = parseFloat(editAmount);
 												if (!name || isNaN(dollars) || dollars <= 0) return;
 												const amount = Math.round(dollars * 100);
-												store.editItemHandler(item.id, { name, amount, frequency: editFrequency })(ctx);
+												store.editItemHandler(item.id, { name, amount, frequency: editFrequency })(
+													ctx
+												);
 												editingItemId = null;
 											})}
 										>
@@ -288,7 +306,11 @@
 														required
 													/>
 												</div>
-												<select class="input freq-select" name="frequency" bind:value={editFrequency}>
+												<select
+													class="input freq-select"
+													name="frequency"
+													bind:value={editFrequency}
+												>
 													<option value="weekly">Weekly</option>
 													<option value="fortnightly">Fortnightly</option>
 													<option value="monthly">Monthly</option>
@@ -302,7 +324,6 @@
 											</div>
 										</form>
 										<form
-											action={deleteForm.action}
 											{...deleteForm.enhance((ctx) => {
 												store.removeItemHandler(item.id)(ctx);
 												editingItemId = null;
@@ -314,7 +335,10 @@
 										</form>
 									</li>
 								{:else}
-									<li class="item-row" role="button" tabindex="0"
+									<li
+										class="item-row"
+										role="button"
+										tabindex="0"
 										onclick={() => startEdit(item)}
 										onkeydown={(e) => e.key === 'Enter' && startEdit(item)}
 									>
@@ -331,7 +355,6 @@
 
 					{#if addingSection === type}
 						<form
-							action={addBudgetItem.action}
 							{...addBudgetItem.enhance((ctx) => {
 								const name = addName.trim();
 								const dollars = parseFloat(addAmount);
@@ -390,7 +413,9 @@
 							</div>
 							<div class="add-actions">
 								<button type="submit" class="btn-primary">Add</button>
-								<button type="button" class="btn-ghost" onclick={() => addingSection = null}>Cancel</button>
+								<button type="button" class="btn-ghost" onclick={() => (addingSection = null)}
+									>Cancel</button
+								>
 							</div>
 						</form>
 					{/if}
@@ -398,7 +423,7 @@
 			{/each}
 		</div>
 
-	<!-- Log view -->
+		<!-- Log view -->
 	{:else}
 		<div class="scroll-area">
 			<!-- Period selectors -->
@@ -407,9 +432,9 @@
 					class="input period-select"
 					class:active={activePeriodType === 'monthly'}
 					bind:value={monthFrom}
-					onchange={() => weekFrom = ''}
+					onchange={() => (weekFrom = '')}
 				>
-					{#each MONTHS as m}
+					{#each MONTHS as m (m.from)}
 						<option value={m.from}>{m.label}</option>
 					{/each}
 				</select>
@@ -417,10 +442,10 @@
 					class="input period-select"
 					class:active={activePeriodType === 'weekly'}
 					value={weekFrom}
-					onchange={(e) => weekFrom = (e.target as HTMLSelectElement).value}
+					onchange={(e) => (weekFrom = (e.target as HTMLSelectElement).value)}
 				>
 					<option value="">— Week —</option>
-					{#each WEEKS as w}
+					{#each WEEKS as w (w.from)}
 						<option value={w.from}>{w.label}</option>
 					{/each}
 				</select>
@@ -431,7 +456,11 @@
 				<div class="surplus-card">
 					<div class="surplus-header">
 						<span class="surplus-label">Surplus</span>
-						<span class="surplus-amount" class:warning={surplus.status === 'warning'} class:danger={surplus.status === 'danger'}>
+						<span
+							class="surplus-amount"
+							class:warning={surplus.status === 'warning'}
+							class:danger={surplus.status === 'danger'}
+						>
 							{fmt(Math.max(surplus.remaining, 0))} remaining of {fmt(surplus.max)}
 						</span>
 					</div>
@@ -442,7 +471,10 @@
 							class:danger={surplus.status === 'danger'}
 							style="width: {surplus.remainingPct}%"
 						></div>
-						<div class="surplus-marker allocations" style="left: {surplus.allocationLinePct}%"></div>
+						<div
+							class="surplus-marker allocations"
+							style="left: {surplus.allocationLinePct}%"
+						></div>
 						<div class="surplus-marker savings" style="left: {surplus.savingsLinePct}%"></div>
 					</div>
 					<div class="surplus-legend">
@@ -461,13 +493,14 @@
 			<!-- Category progress -->
 			{#if store.allocations.length > 0}
 				<div class="progress-section">
-					{#each categoryProgress as { allocation, target, spent }}
+					{#each categoryProgress as { allocation, target, spent } (allocation.id)}
 						{@const pct = target > 0 ? spent / target : 0}
 						<div class="progress-row">
 							<div class="progress-labels">
 								<span class="progress-name">{allocation.name}</span>
 								<span class="progress-amounts">
-									{fmt(spent)} <span class="of">of</span> {fmt(target)}
+									{fmt(spent)} <span class="of">of</span>
+									{fmt(target)}
 								</span>
 							</div>
 							<div class="progress-track">
@@ -488,7 +521,7 @@
 				<p class="empty-msg">No expenses logged for this period.</p>
 			{:else}
 				<div class="expense-list">
-					{#each groupedExpenses as { date, expenses }}
+					{#each groupedExpenses as { date, expenses } (date)}
 						<div class="date-group">
 							<div class="date-label">{fmtDate(date)}</div>
 							{#each expenses as expense (expense.id)}
@@ -497,7 +530,9 @@
 									<div class="expense-info">
 										<span class="expense-desc">{expense.description}</span>
 										{#if expense.categoryId}
-											<span class="category-chip">{categoryMap.get(expense.categoryId) ?? 'Other'}</span>
+											<span class="category-chip"
+												>{categoryMap.get(expense.categoryId) ?? 'Other'}</span
+											>
 										{:else}
 											<span class="category-chip other">Other</span>
 										{/if}
@@ -505,14 +540,14 @@
 									<div class="expense-right">
 										<span class="expense-amount">{fmt(expense.amount)}</span>
 										<form
-											action={remover.action}
 											{...remover.enhance((ctx) => {
 												store.removeExpenseHandler(expense.id)(ctx);
 											})}
 											class="delete-form"
 										>
 											<input type="hidden" name="id" value={expense.id} />
-											<button type="submit" class="delete-btn" aria-label="Remove expense">×</button>
+											<button type="submit" class="delete-btn" aria-label="Remove expense">×</button
+											>
 										</form>
 									</div>
 								</div>
@@ -530,7 +565,6 @@
 
 		<!-- Add expense form -->
 		<form
-			action={addExpense.action}
 			{...addExpense.enhance((ctx) => {
 				const desc = expDesc.trim();
 				const dollars = parseFloat(expAmount);
@@ -581,16 +615,10 @@
 				</div>
 			</div>
 			<div class="expense-add-row">
-				<input
-					class="input exp-date"
-					type="date"
-					name="date"
-					bind:value={expDate}
-					required
-				/>
+				<input class="input exp-date" type="date" name="date" bind:value={expDate} required />
 				<select class="input exp-category" name="category_id" bind:value={expCategoryId}>
 					<option value="">Other</option>
-					{#each store.allocations as a}
+					{#each store.allocations as a (a.id)}
 						<option value={a.id}>{a.name}</option>
 					{/each}
 				</select>
@@ -643,8 +671,9 @@
 		font-size: var(--font-size-sm);
 		font-family: var(--font-body);
 		cursor: pointer;
-		transition: background var(--duration-fast) var(--ease-standard),
-		            color var(--duration-fast) var(--ease-standard);
+		transition:
+			background var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
 	}
 
 	.tab-btn.active {
@@ -707,17 +736,24 @@
 		margin: var(--space-1) 0;
 	}
 
-	.amount { font-variant-numeric: tabular-nums; }
-	.amount.income { color: var(--color-success); }
-	.amount.outgoing { color: var(--color-text-muted); }
-	.amount.danger { color: var(--color-danger); }
+	.amount {
+		font-variant-numeric: tabular-nums;
+	}
+	.amount.income {
+		color: var(--color-success);
+	}
+	.amount.outgoing {
+		color: var(--color-text-muted);
+	}
+	.amount.danger {
+		color: var(--color-danger);
+	}
 
 	/* Plan sections */
 	.plan-section {
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-lg);
-		overflow: hidden;
 	}
 
 	.section-header {
@@ -870,7 +906,10 @@
 		box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus-ring) 20%, transparent);
 	}
 
-	.name-input { flex: 2; min-width: 0; }
+	.name-input {
+		flex: 2;
+		min-width: 0;
+	}
 
 	.amount-wrap {
 		position: relative;
@@ -894,7 +933,10 @@
 		width: 100%;
 	}
 
-	.freq-select { flex: 1; min-width: 0; }
+	.freq-select {
+		flex: 1;
+		min-width: 0;
+	}
 
 	/* Buttons */
 	.btn-primary {
@@ -910,7 +952,9 @@
 		transition: background var(--duration-fast) var(--ease-standard);
 	}
 
-	.btn-primary:hover { background: var(--color-primary-hover); }
+	.btn-primary:hover {
+		background: var(--color-primary-hover);
+	}
 
 	.btn-ghost {
 		background: transparent;
@@ -935,7 +979,9 @@
 	}
 
 	/* Delete button */
-	.delete-form { display: contents; }
+	.delete-form {
+		display: contents;
+	}
 
 	.delete-btn {
 		background: transparent;
@@ -947,8 +993,9 @@
 		padding: var(--space-1);
 		border-radius: var(--radius-sm);
 		opacity: 0;
-		transition: opacity var(--duration-fast) var(--ease-standard),
-		            color var(--duration-fast) var(--ease-standard);
+		transition:
+			opacity var(--duration-fast) var(--ease-standard),
+			color var(--duration-fast) var(--ease-standard);
 	}
 
 	.expense-row:hover .delete-btn,
@@ -956,7 +1003,9 @@
 		opacity: 1;
 	}
 
-	.delete-btn:hover { color: var(--color-danger); }
+	.delete-btn:hover {
+		color: var(--color-danger);
+	}
 
 	/* Log view */
 	.period-selects {
@@ -1005,8 +1054,12 @@
 		color: var(--color-text);
 	}
 
-	.surplus-amount.warning { color: var(--color-warning); }
-	.surplus-amount.danger  { color: var(--color-danger); }
+	.surplus-amount.warning {
+		color: var(--color-warning);
+	}
+	.surplus-amount.danger {
+		color: var(--color-danger);
+	}
 
 	.surplus-track {
 		height: var(--space-4);
@@ -1023,8 +1076,12 @@
 		transition: width var(--duration-base) var(--ease-out);
 	}
 
-	.surplus-fill.warning { background: var(--color-warning); }
-	.surplus-fill.danger  { background: var(--color-danger); }
+	.surplus-fill.warning {
+		background: var(--color-warning);
+	}
+	.surplus-fill.danger {
+		background: var(--color-danger);
+	}
 
 	.surplus-marker {
 		position: absolute;
@@ -1035,8 +1092,13 @@
 		z-index: var(--z-base);
 	}
 
-	.surplus-marker.allocations { background: var(--color-text); opacity: 0.6; }
-	.surplus-marker.savings     { background: var(--color-accent); }
+	.surplus-marker.allocations {
+		background: var(--color-text);
+		opacity: 0.6;
+	}
+	.surplus-marker.savings {
+		background: var(--color-accent);
+	}
 
 	.surplus-legend {
 		display: flex;
@@ -1058,8 +1120,13 @@
 		flex-shrink: 0;
 	}
 
-	.legend-pip.allocations { background: var(--color-text); opacity: 0.6; }
-	.legend-pip.savings     { background: var(--color-accent); }
+	.legend-pip.allocations {
+		background: var(--color-text);
+		opacity: 0.6;
+	}
+	.legend-pip.savings {
+		background: var(--color-accent);
+	}
 
 	/* Progress bars */
 	.progress-section {
@@ -1072,7 +1139,11 @@
 		gap: var(--space-4);
 	}
 
-	.progress-row { display: flex; flex-direction: column; gap: var(--space-2); }
+	.progress-row {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
 
 	.progress-labels {
 		display: flex;
@@ -1080,14 +1151,18 @@
 		font-size: var(--font-size-sm);
 	}
 
-	.progress-name { font-weight: var(--font-weight-medium); }
+	.progress-name {
+		font-weight: var(--font-weight-medium);
+	}
 
 	.progress-amounts {
 		color: var(--color-text-muted);
 		font-variant-numeric: tabular-nums;
 	}
 
-	.of { color: var(--color-text-subtle); }
+	.of {
+		color: var(--color-text-subtle);
+	}
 
 	.progress-track {
 		height: var(--space-2);
@@ -1103,19 +1178,26 @@
 		transition: width var(--duration-base) var(--ease-out);
 	}
 
-	.progress-fill.warning { background: var(--color-warning); }
-	.progress-fill.danger  { background: var(--color-danger); }
+	.progress-fill.warning {
+		background: var(--color-warning);
+	}
+	.progress-fill.danger {
+		background: var(--color-danger);
+	}
 
 	/* Expense list */
 	.expense-list {
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-lg);
-		overflow: hidden;
 	}
 
-	.date-group { border-bottom: 1px solid var(--color-border-subtle); }
-	.date-group:last-of-type { border-bottom: none; }
+	.date-group {
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
+	.date-group:last-of-type {
+		border-bottom: none;
+	}
 
 	.date-label {
 		padding: var(--space-2) var(--space-4);
@@ -1136,7 +1218,9 @@
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
-	.expense-row:last-child { border-bottom: none; }
+	.expense-row:last-child {
+		border-bottom: none;
+	}
 
 	.expense-info {
 		flex: 1;
@@ -1207,8 +1291,19 @@
 		gap: var(--space-2);
 	}
 
-	.exp-desc { flex: 2; min-width: 0; }
-	.exp-date { flex: 1; min-width: 0; }
-	.exp-category { flex: 1; min-width: 0; }
-	.add-exp-btn { flex: none; }
+	.exp-desc {
+		flex: 2;
+		min-width: 0;
+	}
+	.exp-date {
+		flex: 1;
+		min-width: 0;
+	}
+	.exp-category {
+		flex: 1;
+		min-width: 0;
+	}
+	.add-exp-btn {
+		flex: none;
+	}
 </style>
