@@ -6,7 +6,8 @@ import {
 	deleteExpense,
 	getBudgetItemsForBudget,
 	getExpensesForBudget,
-	getOrCreateHouseholdBudget
+	getOrCreateHouseholdBudget,
+	updateBudgetItem
 } from '$lib/server/db/queries';
 import * as v from 'valibot';
 
@@ -49,6 +50,21 @@ export const addBudgetItem = form(
 			frequency: frequency as any,
 			sortOrder: Date.now()
 		});
+		void getBudgetItems().refresh();
+	}
+);
+
+export const editBudgetItem = form(
+	v.object({
+		id: v.pipe(v.string(), v.nonEmpty()),
+		name: v.pipe(v.string(), v.trim(), v.nonEmpty()),
+		amount: v.pipe(v.string(), v.transform((s) => Math.round(parseFloat(s) * 100))),
+		frequency: v.string()
+	}),
+	async ({ id, name, amount, frequency }) => {
+		const { locals } = getRequestEvent();
+		if (!locals.user) throw 'Not authenticated';
+		await updateBudgetItem(locals.db, id, { name, amount, frequency: frequency as any });
 		void getBudgetItems().refresh();
 	}
 );

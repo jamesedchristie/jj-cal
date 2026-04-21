@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { BudgetFrequency, BudgetItemType } from '$lib/server/db/schema';
-	import { addBudgetItem, addExpense, getBudget, removeBudgetItem, removeExpense } from './data.remote';
+	import { addBudgetItem, addExpense, editBudgetItem, getBudget, removeBudgetItem, removeExpense } from './data.remote';
 	import { createBudgetStore, type BudgetItem, type Expense } from './budget-store.svelte';
 
 	const store = createBudgetStore();
@@ -15,6 +15,12 @@
 	let addAmount = $state('');
 	let addFrequency = $state<BudgetFrequency>('monthly');
 	let pendingItemId = $state(crypto.randomUUID());
+
+	// --- Edit state ---
+	let editingItemId = $state<string | null>(null);
+	let editName = $state('');
+	let editAmount = $state('');
+	let editFrequency = $state<BudgetFrequency>('monthly');
 
 	// --- Log state ---
 	let logPeriod = $state<'weekly' | 'monthly'>('monthly');
@@ -32,14 +38,16 @@
 	const periodExpenses = $derived(store.expensesInPeriod(periodRange.from, periodRange.to));
 	const categoryMap = $derived(new Map(store.allocations.map((a) => [a.id, a.name])));
 
-	const groupedExpenses = $derived(() => {
-		const groups = new Map<string, Expense[]>();
-		for (const e of periodExpenses) {
-			if (!groups.has(e.date)) groups.set(e.date, []);
-			groups.get(e.date)!.push(e);
-		}
-		return Array.from(groups.entries()).map(([date, expenses]) => ({ date, expenses }));
-	});
+	const groupedExpenses = $derived(
+		(() => {
+			const groups = new Map<string, Expense[]>();
+			for (const e of periodExpenses) {
+				if (!groups.has(e.date)) groups.set(e.date, []);
+				groups.get(e.date)!.push(e);
+			}
+			return Array.from(groups.entries()).map(([date, expenses]) => ({ date, expenses }));
+		})()
+	);
 
 	const periodTotal = $derived(periodExpenses.reduce((s, e) => s + e.amount, 0));
 
@@ -100,6 +108,7 @@
 	}
 
 	function toggleSection(type: BudgetItemType) {
+		editingItemId = null;
 		if (addingSection === type) {
 			addingSection = null;
 		} else {
@@ -108,6 +117,18 @@
 			addAmount = '';
 			addFrequency = 'monthly';
 		}
+	}
+
+	function startEdit(item: BudgetItem) {
+		addingSection = null;
+		editingItemId = item.id;
+		editName = item.name;
+		editAmount = (item.amount / 100).toString();
+		editFrequency = item.frequency;
+	}
+
+	function cancelEdit() {
+		editingItemId = null;
 	}
 </script>
 
@@ -193,22 +214,78 @@
 					{:else}
 						<ul class="item-list">
 							{#each items as item (item.id)}
-								<li class="item-row">
-									<span class="item-name">{item.name}</span>
-									<span class="item-meta">
-										{fmt(item.amount)}<span class="freq">{FREQ_LABELS[item.frequency]}</span>
-									</span>
-									<form
-										action={removeBudgetItem.action}
-										{...removeBudgetItem.enhance((ctx) => {
-											store.removeItemHandler(item.id)(ctx);
-										})}
-										class="delete-form"
+								{#if editingItemId === item.id}
+									<li class="item-edit">
+										<form
+											action={editBudgetItem.action}
+											{...editBudgetItem.enhance((ctx) => {
+												const name = editName.trim();
+												const dollars = parseFloat(editAmount);
+												if (!name || isNaN(dollars) || dollars <= 0) return;
+												const amount = Math.round(dollars * 100);
+												store.editItemHandler(item.id, { name, amount, frequency: editFrequency })(ctx);
+												editingItemId = null;
+											})}
+										>
+											<input type="hidden" name="id" value={item.id} />
+											<div class="add-row">
+												<input
+													class="input name-input"
+													type="text"
+													name="name"
+													bind:value={editName}
+													required
+													autocomplete="off"
+												/>
+												<div class="amount-wrap">
+													<span class="dollar-sign">$</span>
+													<input
+														class="input amount-input"
+														type="number"
+														name="amount"
+														step="0.01"
+														min="0.01"
+														bind:value={editAmount}
+														required
+													/>
+												</div>
+												<select class="input freq-select" name="frequency" bind:value={editFrequency}>
+													<option value="weekly">Weekly</option>
+													<option value="fortnightly">Fortnightly</option>
+													<option value="monthly">Monthly</option>
+													<option value="quarterly">Quarterly</option>
+													<option value="yearly">Yearly</option>
+												</select>
+											</div>
+											<div class="add-actions">
+												<button type="submit" class="btn-primary">Save</button>
+												<button type="button" class="btn-ghost" onclick={cancelEdit}>Cancel</button>
+												<form
+													action={removeBudgetItem.action}
+													{...removeBudgetItem.enhance((ctx) => {
+														store.removeItemHandler(item.id)(ctx);
+														editingItemId = null;
+													})}
+													style="margin-left: auto;"
+												>
+													<input type="hidden" name="id" value={item.id} />
+													<button type="submit" class="btn-danger">Delete</button>
+												</form>
+											</div>
+										</form>
+									</li>
+								{:else}
+									<li class="item-row" role="button" tabindex="0"
+										onclick={() => startEdit(item)}
+										onkeydown={(e) => e.key === 'Enter' && startEdit(item)}
 									>
-										<input type="hidden" name="id" value={item.id} />
-										<button type="submit" class="delete-btn" aria-label="Remove {item.name}">×</button>
-									</form>
-								</li>
+										<span class="item-name">{item.name}</span>
+										<span class="item-meta">
+											{fmt(item.amount)}<span class="freq">{FREQ_LABELS[item.frequency]}</span>
+										</span>
+										<span class="edit-hint" aria-hidden="true">›</span>
+									</li>
+								{/if}
 							{/each}
 						</ul>
 					{/if}
@@ -331,7 +408,7 @@
 				<p class="empty-msg">No expenses logged for this period.</p>
 			{:else}
 				<div class="expense-list">
-					{#each groupedExpenses() as { date, expenses }}
+					{#each groupedExpenses as { date, expenses }}
 						<div class="date-group">
 							<div class="date-label">{fmtDate(date)}</div>
 							{#each expenses as expense (expense.id)}
@@ -620,9 +697,34 @@
 		gap: var(--space-3);
 		padding: var(--space-3) var(--space-4);
 		border-bottom: 1px solid var(--color-border-subtle);
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-standard);
 	}
 
-	.item-row:last-child {
+	.item-row:hover {
+		background: var(--color-surface-sunken);
+	}
+
+	.item-edit {
+		border-bottom: 1px solid var(--color-border-subtle);
+		background: var(--color-surface-sunken);
+	}
+
+	.item-edit form {
+		padding: var(--space-3) var(--space-4);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.edit-hint {
+		color: var(--color-text-subtle);
+		font-size: var(--font-size-md);
+		margin-left: auto;
+	}
+
+	.item-row:last-child,
+	.item-edit:last-child {
 		border-bottom: none;
 	}
 
@@ -733,6 +835,17 @@
 		cursor: pointer;
 	}
 
+	.btn-danger {
+		background: transparent;
+		color: var(--color-danger);
+		border: 1px solid var(--color-danger);
+		border-radius: var(--radius-md);
+		padding: var(--space-2) var(--space-3);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-body);
+		cursor: pointer;
+	}
+
 	/* Delete button */
 	.delete-form { display: contents; }
 
@@ -750,8 +863,6 @@
 		            color var(--duration-fast) var(--ease-standard);
 	}
 
-	.item-row:hover .delete-btn,
-	.item-row:focus-within .delete-btn,
 	.expense-row:hover .delete-btn,
 	.expense-row:focus-within .delete-btn {
 		opacity: 1;

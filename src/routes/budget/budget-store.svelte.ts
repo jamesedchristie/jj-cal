@@ -117,6 +117,15 @@ export function createBudgetStore() {
 			});
 		},
 
+		editItemHandler(itemId: string, updates: { name: string; amount: number; frequency: BudgetFrequency }) {
+			return (ctx: EnhanceArgs) => {
+				const override = getBudgetItems().withOverride((items) =>
+					items.map((i) => (i.id === itemId ? { ...i, ...updates } : i))
+				);
+				dispatch(ctx, override, 'Failed to save changes');
+			};
+		},
+
 		addItemHandler(optimistic: BudgetItem) {
 			return (ctx: EnhanceArgs) => {
 				const override = getBudgetItems().withOverride((items) => [

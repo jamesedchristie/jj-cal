@@ -697,6 +697,14 @@ export async function createBudgetItem(
 	return rows[0];
 }
 
+export async function updateBudgetItem(
+	db: DrizzleClient,
+	id: string,
+	updates: { name: string; amount: number; frequency: BudgetFrequency }
+) {
+	await db.update(budgetItemsTable).set(updates).where(eq(budgetItemsTable.id, id));
+}
+
 export async function deleteBudgetItem(db: DrizzleClient, id: string) {
 	await db.delete(budgetItemsTable).where(eq(budgetItemsTable.id, id));
 }
