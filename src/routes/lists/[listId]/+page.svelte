@@ -4,6 +4,7 @@
 	import { getToastService, ToastMessage } from '$lib/components/toast/toastService.svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import { INTERVAL_LABELS, RECURRENCE_INTERVALS, type RecurrenceInterval } from '$lib/recurrence';
+	import { sortable } from '$lib/sortable';
 	import { tick } from 'svelte';
 	import {
 		addItem,
@@ -11,11 +12,10 @@
 		getList,
 		getUsers,
 		removeItem,
-		reorderItems,
 		renameList,
+		reorderItems,
 		toggleItem
 	} from './data.remote';
-	import { sortable } from '$lib/sortable';
 	import { createListStore } from './list-store.svelte';
 
 	const toastService = getToastService();
@@ -859,6 +859,8 @@
 		flex: 1;
 		overflow-y: auto;
 		padding-bottom: var(--space-4);
+		display: flex;
+		flex-direction: column;
 	}
 
 	.item-list {
@@ -866,6 +868,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		flex: 1;
 
 		li {
 			display: flex;

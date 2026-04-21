@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { tick } from 'svelte';
 	import UserAvatar from '$lib/components/UserAvatar.svelte';
 	import { INTERVAL_LABELS, RECURRENCE_INTERVALS } from '$lib/recurrence';
+	import { sortable } from '$lib/sortable';
+	import { tick } from 'svelte';
 	import {
 		addItem,
 		editItem,
@@ -11,7 +12,6 @@
 		reorderItems,
 		toggleItem
 	} from './data.remote';
-	import { sortable } from '$lib/sortable';
 	import { createTasksStore } from './tasks-store.svelte';
 
 	// 'mine' = tasks assigned to me or unassigned ones I created
@@ -104,179 +104,246 @@
 	</form>
 
 	<div class="scroll-area">
-	<ul class="todo-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder })}>
-		{#each incomplete as item (item.id)}
-			{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
-			{@const assignee = userById(item.assignedToId ?? null)}
-			<li data-id={item.id} class:overdue={status === 'overdue'}>
-				<span class="drag-handle" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
-				</span>
-				<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, true))}>
-					<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
-					<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'true')} />
-					<button type="submit" class="check" aria-label="Mark complete">
+		<ul class="todo-list" bind:this={listEl} {@attach sortable({ onReorder: handleItemsReorder })}>
+			{#each incomplete as item (item.id)}
+				{@const status = item.dueDate ? dueDateStatus(item.dueDate) : null}
+				{@const assignee = userById(item.assignedToId ?? null)}
+				<li data-id={item.id} class:overdue={status === 'overdue'}>
+					<span class="drag-handle" aria-hidden="true">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+							fill="currentColor"
 							aria-hidden="true"
+							><circle cx="9" cy="5" r="1.5" /><circle cx="15" cy="5" r="1.5" /><circle
+								cx="9"
+								cy="12"
+								r="1.5"
+							/><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="19" r="1.5" /><circle
+								cx="15"
+								cy="19"
+								r="1.5"
+							/></svg
 						>
-							<circle cx="12" cy="12" r="10" />
-						</svg>
-					</button>
-				</form>
-				{#if editingId === item.id}
-					<form
-						{...editItem.enhance((ctx) => {
-							const input = ctx.form.elements.namedItem('text') as HTMLInputElement | null;
-							const newText = input?.value.trim() ?? '';
-							if (!newText || newText === item.text) { editingId = null; return; }
-							store.editHandler(item.id, newText)(ctx);
-							editingId = null;
-						})}
-						class="text-edit-form"
-					>
-						<input {...editItem.fields.id.as('hidden', item.id)} />
-						<input
-							bind:this={editInputEl}
-							{...editItem.fields.text.as('text')}
-							value={item.text}
-							class="text-edit"
-							autocapitalize="sentences"
-							onkeydown={(e) => { if (e.key === 'Escape') editingId = null; }}
-							onblur={(e) => {
-								const v = e.currentTarget.value.trim();
-								if (v && v !== item.text) e.currentTarget.form?.requestSubmit();
-								else editingId = null;
-							}}
-						/>
-					</form>
-				{:else}
-					<span
-						class="text editable"
-						role="button"
-						tabindex="0"
-						onclick={() => (editingId = item.id)}
-						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingId = item.id; }}
-					>{item.text}</span>
-				{/if}
-				{#if viewMode === 'all' && item.listName}
-					<span class="list-chip">{item.listName}</span>
-				{/if}
-				{#if item.dueDate}
-					<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
-				{/if}
-				{#if item.recurrenceInterval}
-					<span class="recurrence-chip">{INTERVAL_LABELS[item.recurrenceInterval]}</span>
-				{/if}
-				{#if assignee}
-					<span class="assignee-chip">
-						<UserAvatar
-							name={assignee.name}
-							displayName={assignee.displayName}
-							colour={assignee.colour}
-							size="sm"
-						/>
 					</span>
-				{/if}
-				<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
-					<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
-					<button type="submit" class="delete" aria-label="Delete task">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
+					<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, true))}>
+						<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+						<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'true')} />
+						<button type="submit" class="check" aria-label="Mark complete">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<circle cx="12" cy="12" r="10" />
+							</svg>
+						</button>
+					</form>
+					{#if editingId === item.id}
+						<form
+							{...editItem.enhance((ctx) => {
+								const input = ctx.form.elements.namedItem('text') as HTMLInputElement | null;
+								const newText = input?.value.trim() ?? '';
+								if (!newText || newText === item.text) {
+									editingId = null;
+									return;
+								}
+								store.editHandler(item.id, newText)(ctx);
+								editingId = null;
+							})}
+							class="text-edit-form"
 						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
-					</button>
-				</form>
-			</li>
-		{/each}
-	</ul>
+							<input {...editItem.fields.id.as('hidden', item.id)} />
+							<input
+								bind:this={editInputEl}
+								{...editItem.fields.text.as('text')}
+								value={item.text}
+								class="text-edit"
+								autocapitalize="sentences"
+								onkeydown={(e) => {
+									if (e.key === 'Escape') editingId = null;
+								}}
+								onblur={(e) => {
+									const v = e.currentTarget.value.trim();
+									if (v && v !== item.text) e.currentTarget.form?.requestSubmit();
+									else editingId = null;
+								}}
+							/>
+						</form>
+					{:else}
+						<span
+							class="text editable"
+							role="button"
+							tabindex="0"
+							onclick={() => (editingId = item.id)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') editingId = item.id;
+							}}>{item.text}</span
+						>
+					{/if}
+					{#if viewMode === 'all' && item.listName}
+						<span class="list-chip">{item.listName}</span>
+					{/if}
+					{#if item.dueDate}
+						<span class="due-chip {status}">{formatDueDate(item.dueDate)}</span>
+					{/if}
+					{#if item.recurrenceInterval}
+						<span class="recurrence-chip">{INTERVAL_LABELS[item.recurrenceInterval]}</span>
+					{/if}
+					{#if assignee}
+						<span class="assignee-chip">
+							<UserAvatar
+								name={assignee.name}
+								displayName={assignee.displayName}
+								colour={assignee.colour}
+								size="sm"
+							/>
+						</span>
+					{/if}
+					<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
+						<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
+						<button type="submit" class="delete" aria-label="Delete task">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					</form>
+				</li>
+			{/each}
+		</ul>
 
-	{#if recentlyCompleted.length > 0}
-		<details class="completed-section">
-			<summary>{recentlyCompleted.length} completed</summary>
-			<ul class="todo-list completed">
-				{#each recentlyCompleted as item (item.id)}
-					{@const assignee = userById(item.assignedToId ?? null)}
-					<li>
-						<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
-							<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
-							<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
-							<button type="submit" class="check done" aria-label="Mark incomplete">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
-								</svg>
-							</button>
-						</form>
-						<span class="text">{item.text}</span>
-						{#if assignee}
-							<span class="assignee-chip">
-								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
-							</span>
-						{/if}
-						<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
-							<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
-							<button type="submit" class="delete" aria-label="Delete task">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-								</svg>
-							</button>
-						</form>
-					</li>
-				{/each}
-			</ul>
-		</details>
-	{/if}
+		{#if recentlyCompleted.length > 0}
+			<details class="completed-section">
+				<summary>{recentlyCompleted.length} completed</summary>
+				<ul class="todo-list completed">
+					{#each recentlyCompleted as item (item.id)}
+						{@const assignee = userById(item.assignedToId ?? null)}
+						<li>
+							<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
+								<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+								<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
+								<button type="submit" class="check done" aria-label="Mark incomplete">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
+									</svg>
+								</button>
+							</form>
+							<span class="text">{item.text}</span>
+							{#if assignee}
+								<span class="assignee-chip">
+									<UserAvatar
+										name={assignee.name}
+										displayName={assignee.displayName}
+										colour={assignee.colour}
+										size="sm"
+									/>
+								</span>
+							{/if}
+							<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
+								<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
+								<button type="submit" class="delete" aria-label="Delete task">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+									</svg>
+								</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			</details>
+		{/if}
 
-	{#if archivedCompleted.length > 0}
-		<details class="completed-section archived-section">
-			<summary>{archivedCompleted.length} archived</summary>
-			<ul class="todo-list completed">
-				{#each archivedCompleted as item (item.id)}
-					{@const assignee = userById(item.assignedToId ?? null)}
-					<li>
-						<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
-							<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
-							<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
-							<button type="submit" class="check done" aria-label="Mark incomplete">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
-								</svg>
-							</button>
-						</form>
-						<span class="text">{item.text}</span>
-						{#if assignee}
-							<span class="assignee-chip">
-								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
-							</span>
-						{/if}
-						<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
-							<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
-							<button type="submit" class="delete" aria-label="Delete task">
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-								</svg>
-							</button>
-						</form>
-					</li>
-				{/each}
-			</ul>
-		</details>
-	{/if}
+		{#if archivedCompleted.length > 0}
+			<details class="completed-section archived-section">
+				<summary>{archivedCompleted.length} archived</summary>
+				<ul class="todo-list completed">
+					{#each archivedCompleted as item (item.id)}
+						{@const assignee = userById(item.assignedToId ?? null)}
+						<li>
+							<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
+								<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+								<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
+								<button type="submit" class="check done" aria-label="Mark incomplete">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
+									</svg>
+								</button>
+							</form>
+							<span class="text">{item.text}</span>
+							{#if assignee}
+								<span class="assignee-chip">
+									<UserAvatar
+										name={assignee.name}
+										displayName={assignee.displayName}
+										colour={assignee.colour}
+										size="sm"
+									/>
+								</span>
+							{/if}
+							<form {...removeItem.enhance(store.removeHandler(item.id))}>
+								<input {...removeItem.fields.id.as('hidden', item.id)} />
+								<button type="submit" class="delete" aria-label="Delete task">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+									</svg>
+								</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			</details>
+		{/if}
 	</div>
 
 	<form
@@ -300,7 +367,9 @@
 			showMeta = false;
 			newItemId = crypto.randomUUID();
 			tick().then(() => {
-				requestAnimationFrame(() => listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' }));
+				requestAnimationFrame(() =>
+					listEl?.scrollTo({ top: listEl.scrollHeight, behavior: 'smooth' })
+				);
 				textInputEl?.focus();
 			});
 		})}
@@ -334,7 +403,11 @@
 					stroke-linejoin="round"
 					aria-hidden="true"
 				>
-					<circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" />
+					<circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle
+						cx="19"
+						cy="12"
+						r="1"
+					/>
 				</svg>
 			</button>
 			<button type="submit" aria-label="Add task">
@@ -436,7 +509,6 @@
 			</div>
 		{/if}
 	</form>
-
 </div>
 
 <style>
@@ -694,9 +766,12 @@
 		flex: 1;
 		overflow-y: auto;
 		padding-bottom: var(--space-4);
+		display: flex;
+		flex-direction: column;
 	}
 
 	.todo-list {
+		flex: 1;
 		padding: 0 var(--space-4) var(--space-3);
 		display: flex;
 		flex-direction: column;
