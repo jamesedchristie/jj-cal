@@ -112,9 +112,9 @@
 				<span class="drag-handle" aria-hidden="true">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
 				</span>
-				<form {...toggleItem.enhance(store.toggleHandler(item.id, true))}>
-					<input {...toggleItem.fields.id.as('hidden', item.id)} />
-					<input {...toggleItem.fields.completed.as('hidden', 'true')} />
+				<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, true))}>
+					<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+					<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'true')} />
 					<button type="submit" class="check" aria-label="Mark complete">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -184,8 +184,8 @@
 						/>
 					</span>
 				{/if}
-				<form {...removeItem.enhance(store.removeHandler(item.id))}>
-					<input {...removeItem.fields.id.as('hidden', item.id)} />
+				<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
+					<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
 					<button type="submit" class="delete" aria-label="Delete task">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -213,9 +213,9 @@
 				{#each recentlyCompleted as item (item.id)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggleItem.enhance(store.toggleHandler(item.id, false))}>
-							<input {...toggleItem.fields.id.as('hidden', item.id)} />
-							<input {...toggleItem.fields.completed.as('hidden', 'false')} />
+						<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
+							<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+							<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
@@ -228,8 +228,8 @@
 								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 							</span>
 						{/if}
-						<form {...removeItem.enhance(store.removeHandler(item.id))}>
-							<input {...removeItem.fields.id.as('hidden', item.id)} />
+						<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
+							<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -249,9 +249,9 @@
 				{#each archivedCompleted as item (item.id)}
 					{@const assignee = userById(item.assignedToId ?? null)}
 					<li>
-						<form {...toggleItem.enhance(store.toggleHandler(item.id, false))}>
-							<input {...toggleItem.fields.id.as('hidden', item.id)} />
-							<input {...toggleItem.fields.completed.as('hidden', 'false')} />
+						<form {...toggleItem.for(item.id).enhance(store.toggleHandler(item.id, false))}>
+							<input {...toggleItem.for(item.id).fields.id.as('hidden', item.id)} />
+							<input {...toggleItem.for(item.id).fields.completed.as('hidden', 'false')} />
 							<button type="submit" class="check done" aria-label="Mark incomplete">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-5" />
@@ -264,8 +264,8 @@
 								<UserAvatar name={assignee.name} displayName={assignee.displayName} colour={assignee.colour} size="sm" />
 							</span>
 						{/if}
-						<form {...removeItem.enhance(store.removeHandler(item.id))}>
-							<input {...removeItem.fields.id.as('hidden', item.id)} />
+						<form {...removeItem.for(item.id).enhance(store.removeHandler(item.id))}>
+							<input {...removeItem.for(item.id).fields.id.as('hidden', item.id)} />
 							<button type="submit" class="delete" aria-label="Delete task">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
