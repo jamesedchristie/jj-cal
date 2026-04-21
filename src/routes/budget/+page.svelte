@@ -260,18 +260,18 @@
 											<div class="add-actions">
 												<button type="submit" class="btn-primary">Save</button>
 												<button type="button" class="btn-ghost" onclick={cancelEdit}>Cancel</button>
-												<form
-													action={removeBudgetItem.action}
-													{...removeBudgetItem.enhance((ctx) => {
-														store.removeItemHandler(item.id)(ctx);
-														editingItemId = null;
-													})}
-													style="margin-left: auto;"
-												>
-													<input type="hidden" name="id" value={item.id} />
-													<button type="submit" class="btn-danger">Delete</button>
-												</form>
 											</div>
+										</form>
+										<form
+											action={removeBudgetItem.action}
+											{...removeBudgetItem.enhance((ctx) => {
+												store.removeItemHandler(item.id)(ctx);
+												editingItemId = null;
+											})}
+											class="item-delete-form"
+										>
+											<input type="hidden" name="id" value={item.id} />
+											<button type="submit" class="btn-danger">Delete</button>
 										</form>
 									</li>
 								{:else}
@@ -706,15 +706,22 @@
 	}
 
 	.item-edit {
+		position: relative;
 		border-bottom: 1px solid var(--color-border-subtle);
 		background: var(--color-surface-sunken);
 	}
 
-	.item-edit form {
+	.item-edit > form:first-child {
 		padding: var(--space-3) var(--space-4);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+	}
+
+	.item-delete-form {
+		position: absolute;
+		right: var(--space-4);
+		bottom: var(--space-3);
 	}
 
 	.edit-hint {
