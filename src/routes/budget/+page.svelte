@@ -22,8 +22,48 @@
 	let editAmount = $state('');
 	let editFrequency = $state<BudgetFrequency>('monthly');
 
+	// --- Period options (generated once) ---
+	type PeriodOption = { label: string; from: string; to: string };
+
+	function isoDate(d: Date): string {
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	}
+
+	function generateMonths(count: number): PeriodOption[] {
+		const now = new Date();
+		return Array.from({ length: count }, (_, i) => {
+			const d    = new Date(now.getFullYear(), now.getMonth() - i, 1);
+			const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+			return {
+				label: d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
+				from:  isoDate(d),
+				to:    isoDate(last)
+			};
+		});
+	}
+
+	function generateWeeks(count: number): PeriodOption[] {
+		const now = new Date();
+		const daysToMon = now.getDay() === 0 ? 6 : now.getDay() - 1;
+		const thisMon = new Date(now);
+		thisMon.setDate(now.getDate() - daysToMon);
+		return Array.from({ length: count }, (_, i) => {
+			const mon = new Date(thisMon);
+			mon.setDate(thisMon.getDate() - i * 7);
+			const sun = new Date(mon);
+			sun.setDate(mon.getDate() + 6);
+			const short = (d: Date) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+			return { from: isoDate(mon), to: isoDate(sun), label: `${short(mon)} – ${short(sun)}` };
+		});
+	}
+
+	const MONTHS = generateMonths(6);
+	const WEEKS  = generateWeeks(16);
+
 	// --- Log state ---
-	let logPeriod = $state<'weekly' | 'monthly'>('monthly');
+	// monthFrom drives the period when weekFrom is empty
+	let monthFrom = $state(MONTHS[0].from);
+	let weekFrom  = $state('');
 	let expDesc = $state('');
 	let expAmount = $state('');
 	let expDate = $state(todaySydney());
@@ -31,9 +71,17 @@
 	let pendingExpenseId = $state(crypto.randomUUID());
 
 	// --- Derived log data ---
-	const periodRange = $derived(getPeriodRange(logPeriod));
+	const activePeriodType = $derived<'weekly' | 'monthly'>(weekFrom ? 'weekly' : 'monthly');
+	const periodRange = $derived(
+		weekFrom
+			? (WEEKS.find((w) => w.from === weekFrom) ?? WEEKS[0])
+			: (MONTHS.find((m) => m.from === monthFrom) ?? MONTHS[0])
+	);
+	const surplus = $derived(
+		store.surplusData(periodRange.from, periodRange.to, activePeriodType)
+	);
 	const categoryProgress = $derived(
-		store.categoryProgress(periodRange.from, periodRange.to, logPeriod)
+		store.categoryProgress(periodRange.from, periodRange.to, activePeriodType)
 	);
 	const periodExpenses = $derived(store.expensesInPeriod(periodRange.from, periodRange.to));
 	const categoryMap = $derived(new Map(store.allocations.map((a) => [a.id, a.name])));
@@ -54,17 +102,6 @@
 	// --- Helpers ---
 	function todaySydney(): string {
 		return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
-	}
-
-	function getPeriodRange(period: 'weekly' | 'monthly'): { from: string; to: string } {
-		const today = todaySydney();
-		if (period === 'monthly') return { from: today.slice(0, 7) + '-01', to: today };
-		const now = new Date();
-		const dow = now.getDay();
-		const daysToMon = dow === 0 ? 6 : dow - 1;
-		const mon = new Date(now);
-		mon.setDate(now.getDate() - daysToMon);
-		return { from: new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(mon), to: today };
 	}
 
 	function fmt(cents: number): string {
@@ -215,10 +252,12 @@
 						<ul class="item-list">
 							{#each items as item (item.id)}
 								{#if editingItemId === item.id}
+									{@const editForm   = editBudgetItem.for(item.id)}
+									{@const deleteForm = removeBudgetItem.for(item.id)}
 									<li class="item-edit">
 										<form
-											action={editBudgetItem.action}
-											{...editBudgetItem.enhance((ctx) => {
+											action={editForm.action}
+											{...editForm.enhance((ctx) => {
 												const name = editName.trim();
 												const dollars = parseFloat(editAmount);
 												if (!name || isNaN(dollars) || dollars <= 0) return;
@@ -263,8 +302,8 @@
 											</div>
 										</form>
 										<form
-											action={removeBudgetItem.action}
-											{...removeBudgetItem.enhance((ctx) => {
+											action={deleteForm.action}
+											{...deleteForm.enhance((ctx) => {
 												store.removeItemHandler(item.id)(ctx);
 												editingItemId = null;
 											})}
@@ -362,21 +401,62 @@
 	<!-- Log view -->
 	{:else}
 		<div class="scroll-area">
-			<!-- Period toggle -->
-			<div class="period-toggle">
-				<button
-					type="button"
-					class="period-btn"
-					class:active={logPeriod === 'monthly'}
-					onclick={() => logPeriod = 'monthly'}
-				>This month</button>
-				<button
-					type="button"
-					class="period-btn"
-					class:active={logPeriod === 'weekly'}
-					onclick={() => logPeriod = 'weekly'}
-				>This week</button>
+			<!-- Period selectors -->
+			<div class="period-selects">
+				<select
+					class="input period-select"
+					class:active={activePeriodType === 'monthly'}
+					bind:value={monthFrom}
+					onchange={() => weekFrom = ''}
+				>
+					{#each MONTHS as m}
+						<option value={m.from}>{m.label}</option>
+					{/each}
+				</select>
+				<select
+					class="input period-select"
+					class:active={activePeriodType === 'weekly'}
+					value={weekFrom}
+					onchange={(e) => weekFrom = (e.target as HTMLSelectElement).value}
+				>
+					<option value="">— Week —</option>
+					{#each WEEKS as w}
+						<option value={w.from}>{w.label}</option>
+					{/each}
+				</select>
 			</div>
+
+			<!-- Surplus bar -->
+			{#if surplus}
+				<div class="surplus-card">
+					<div class="surplus-header">
+						<span class="surplus-label">Surplus</span>
+						<span class="surplus-amount" class:warning={surplus.status === 'warning'} class:danger={surplus.status === 'danger'}>
+							{fmt(Math.max(surplus.remaining, 0))} remaining of {fmt(surplus.max)}
+						</span>
+					</div>
+					<div class="surplus-track">
+						<div
+							class="surplus-fill"
+							class:warning={surplus.status === 'warning'}
+							class:danger={surplus.status === 'danger'}
+							style="width: {surplus.remainingPct}%"
+						></div>
+						<div class="surplus-marker allocations" style="left: {surplus.allocationLinePct}%"></div>
+						<div class="surplus-marker savings" style="left: {surplus.savingsLinePct}%"></div>
+					</div>
+					<div class="surplus-legend">
+						<span class="legend-item">
+							<span class="legend-pip allocations"></span>
+							Allocations ({fmt(surplus.periodAllocs)})
+						</span>
+						<span class="legend-item">
+							<span class="legend-pip savings"></span>
+							Savings target ({fmt(surplus.periodSavings)})
+						</span>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Category progress -->
 			{#if store.allocations.length > 0}
@@ -412,6 +492,7 @@
 						<div class="date-group">
 							<div class="date-label">{fmtDate(date)}</div>
 							{#each expenses as expense (expense.id)}
+								{@const remover = removeExpense.for(expense.id)}
 								<div class="expense-row">
 									<div class="expense-info">
 										<span class="expense-desc">{expense.description}</span>
@@ -424,8 +505,8 @@
 									<div class="expense-right">
 										<span class="expense-amount">{fmt(expense.amount)}</span>
 										<form
-											action={removeExpense.action}
-											{...removeExpense.enhance((ctx) => {
+											action={remover.action}
+											{...remover.enhance((ctx) => {
 												store.removeExpenseHandler(expense.id)(ctx);
 											})}
 											class="delete-form"
@@ -878,29 +959,107 @@
 	.delete-btn:hover { color: var(--color-danger); }
 
 	/* Log view */
-	.period-toggle {
+	.period-selects {
 		display: flex;
 		gap: var(--space-2);
 	}
 
-	.period-btn {
-		padding: var(--space-2) var(--space-4);
-		border-radius: var(--radius-full);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface);
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		font-family: var(--font-body);
+	.period-select {
+		flex: 1;
 		cursor: pointer;
-		transition: background var(--duration-fast) var(--ease-standard),
-		            color var(--duration-fast) var(--ease-standard);
 	}
 
-	.period-btn.active {
-		background: var(--color-primary);
-		color: var(--color-primary-text);
+	.period-select.active {
 		border-color: var(--color-primary);
+		font-weight: var(--font-weight-medium);
 	}
+
+	/* Surplus bar */
+	.surplus-card {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		padding: var(--space-4);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.surplus-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+	}
+
+	.surplus-label {
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-muted);
+		letter-spacing: var(--letter-spacing-wide);
+		text-transform: uppercase;
+	}
+
+	.surplus-amount {
+		font-size: var(--font-size-sm);
+		font-variant-numeric: tabular-nums;
+		color: var(--color-text);
+	}
+
+	.surplus-amount.warning { color: var(--color-warning); }
+	.surplus-amount.danger  { color: var(--color-danger); }
+
+	.surplus-track {
+		height: var(--space-4);
+		background: var(--color-border);
+		border-radius: var(--radius-full);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.surplus-fill {
+		height: 100%;
+		background: var(--color-success);
+		border-radius: var(--radius-full);
+		transition: width var(--duration-base) var(--ease-out);
+	}
+
+	.surplus-fill.warning { background: var(--color-warning); }
+	.surplus-fill.danger  { background: var(--color-danger); }
+
+	.surplus-marker {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		transform: translateX(-50%);
+		z-index: var(--z-base);
+	}
+
+	.surplus-marker.allocations { background: var(--color-text); opacity: 0.6; }
+	.surplus-marker.savings     { background: var(--color-accent); }
+
+	.surplus-legend {
+		display: flex;
+		gap: var(--space-4);
+	}
+
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+	}
+
+	.legend-pip {
+		width: var(--space-2);
+		height: var(--space-4);
+		border-radius: 1px;
+		flex-shrink: 0;
+	}
+
+	.legend-pip.allocations { background: var(--color-text); opacity: 0.6; }
+	.legend-pip.savings     { background: var(--color-accent); }
 
 	/* Progress bars */
 	.progress-section {
