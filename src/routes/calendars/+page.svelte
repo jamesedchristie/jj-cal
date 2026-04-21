@@ -4,11 +4,10 @@
 	import Toast from '$lib/components/toast/Toast.svelte';
 	import { enqueueOrSubmit } from '$lib/offline-queue.svelte';
 	import type { EventRecurrenceRule } from '$lib/server/db/schema';
-	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { createCalendarStore } from './calendar-store.svelte';
-	import { createNewCalendar, getCalendars } from './data.remote';
+	import { createNewCalendar, getCalendars, loadEvents } from './data.remote';
 	import { CalendarEvent } from './events.svelte';
 	import MonthGrid from './MonthGrid.svelte';
 
@@ -36,7 +35,34 @@
 		hiddenCalendarIds = next;
 	}
 
-	// ---- Scroll to today ----
+	// ---- Selected date & events ----
+	let selectedDate = $state<Date>(new Date(today));
+
+	function isSameDay(datetime: number, date: Date) {
+		const e = new Date(datetime);
+		return (
+			e.getFullYear() === date.getFullYear() &&
+			e.getMonth() === date.getMonth() &&
+			e.getDate() === date.getDate()
+		);
+	}
+
+	function formatSelectedDate(date: Date): string {
+		return date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+	}
+
+	// Derive events for the selected date — shares cache with MonthGrid's loadEvents call
+	const rawSelectedMonthEvents = $derived(
+		await loadEvents({ year: selectedDate.getFullYear(), month: selectedDate.getMonth() + 1 })
+	);
+	const selectedDateEvents = $derived(
+		rawSelectedMonthEvents
+			.map((e) => new CalendarEvent(e))
+			.filter((e) => !hiddenCalendarIds.has(e.calendar_id))
+			.filter((e) => isSameDay(e.datetime, selectedDate))
+	);
+
+	// ---- Scroll area ----
 	let scrollAreaEl = $state<HTMLDivElement>();
 	let showTodayBtn = $state(false);
 
@@ -48,11 +74,13 @@
 	// Track whether current month is visible to show/hide back-to-today
 	$effect(() => {
 		if (!scrollAreaEl) return;
-		const id = `month-${todayY}-${String(todayM).padStart(2, '0')}`;
+		const id = `month-${todayY}-${String(todayM).padStart(2, '00')}`;
 		const target = document.getElementById(id);
 		if (!target) return;
 		const observer = new IntersectionObserver(
-			([entry]) => { showTodayBtn = !entry.isIntersecting; },
+			([entry]) => {
+				showTodayBtn = !entry.isIntersecting;
+			},
 			{ root: scrollAreaEl, threshold: 0.1 }
 		);
 		observer.observe(target);
@@ -62,14 +90,37 @@
 	// Scroll to current month on first mount
 	$effect(() => {
 		if (!scrollAreaEl) return;
-		// Wait one frame for layout
 		requestAnimationFrame(scrollToToday);
 	});
 
-	// ---- Dialog ----
-	let selectedDate = $state<Date | null>(null);
-	let selectedDateEvents = $state<CalendarEvent[]>([]);
+	// Auto-select date based on scroll position: pick the topmost visible month
+	function updateSelectedDateFromScroll() {
+		if (!scrollAreaEl) return;
+		const scrollTop = scrollAreaEl.scrollTop;
 
+		let currentMonth = months[0];
+		for (const m of months) {
+			const id = `month-${m.year}-${String(m.month).padStart(2, '0')}`;
+			const el = document.getElementById(id);
+			if (el && el.offsetTop <= scrollTop + 10) {
+				currentMonth = m;
+			}
+		}
+
+		const { year, month } = currentMonth;
+		if (selectedDate.getFullYear() !== year || selectedDate.getMonth() + 1 !== month) {
+			selectedDate =
+				year === todayY && month === todayM ? new Date(today) : new Date(year, month - 1, 1);
+		}
+	}
+
+	$effect(() => {
+		if (!scrollAreaEl) return;
+		scrollAreaEl.addEventListener('scroll', updateSelectedDateFromScroll, { passive: true });
+		return () => scrollAreaEl.removeEventListener('scroll', updateSelectedDateFromScroll);
+	});
+
+	// ---- Event form state ----
 	let selectedCalendarId = $derived(calendars[0]?.id ?? 0);
 	let newEventCalendarId = $state<number | null>(null);
 	let effectiveCalendarId = $derived(newEventCalendarId ?? selectedCalendarId);
@@ -86,25 +137,8 @@
 			.replace(/^-|-$/g, '')
 	);
 
-	let dialog = $state<HTMLDialogElement>();
-
-	function handleDateClick(date: Date, events: CalendarEvent[]) {
+	function handleDateClick(date: Date) {
 		selectedDate = date;
-		selectedDateEvents = events;
-		showDialog();
-	}
-
-	async function showDialog() {
-		if (!dialog) await tick();
-		dialog?.showModal();
-	}
-
-	function hideDialog() {
-		dialog?.close();
-	}
-
-	function formatDialogDate(date: Date): string {
-		return date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 	}
 
 	// ---- Mutations ----
@@ -143,6 +177,8 @@
 	}
 </script>
 
+<Toast />
+
 <div class="calendar-wrapper">
 	<!-- Filter bar -->
 	<section class="filter-bar">
@@ -177,139 +213,158 @@
 		</section>
 	{/if}
 
-	{#if calendars.length === 0 && !showCreateCalendar}
-		<div class="no-calendars">
-			<p>No calendars yet.</p>
-			<button type="button" onclick={() => (showCreateCalendar = true)}>Create your first calendar →</button>
+	<div class="split-area">
+		<!-- Top half: scrollable months -->
+		<div class="top-panel">
+			{#if calendars.length === 0 && !showCreateCalendar}
+				<div class="no-calendars">
+					<p>No calendars yet.</p>
+					<button type="button" onclick={() => (showCreateCalendar = true)}
+						>Create your first calendar →</button
+					>
+				</div>
+			{:else}
+				<div class="scroll-area" bind:this={scrollAreaEl}>
+					{#each months as { year, month } (`${year}-${month}`)}
+						<MonthGrid
+							{year}
+							{month}
+							{todayY}
+							{todayM}
+							{todayD}
+							{hiddenCalendarIds}
+							{selectedDate}
+							onDateClick={handleDateClick}
+						/>
+					{/each}
+				</div>
+			{/if}
+
+			{#if showTodayBtn}
+				<button type="button" class="today-fab" onclick={scrollToToday}>Today</button>
+			{/if}
 		</div>
-	{/if}
 
-	<!-- Scrollable months -->
-	<div class="scroll-area" bind:this={scrollAreaEl}>
-		{#each months as { year, month } (`${year}-${month}`)}
-			<MonthGrid
-				{year}
-				{month}
-				{todayY}
-				{todayM}
-				{todayD}
-				{hiddenCalendarIds}
-				onDateClick={handleDateClick}
-			/>
-		{/each}
-	</div>
+		<!-- Bottom half: events for selected date -->
+		<div class="bottom-panel">
+			<div class="panel-header">
+				<h2 class="panel-date">{formatSelectedDate(selectedDate)}</h2>
+			</div>
 
-	<!-- Back to today -->
-	{#if showTodayBtn}
-		<button type="button" class="today-fab" onclick={scrollToToday}>Today</button>
-	{/if}
-</div>
+			<div class="panel-body">
+				<section class="events">
+					{#if selectedDateEvents.length}
+						<ul>
+							{#each selectedDateEvents as event (event.isRecurring ? `${event.recurrenceGroupId}:${event.datetime}` : event.id)}
+								<li animate:flip>
+									<div class="event-input">
+										<div class="event-meta">
+											{#if event.calendar_colour}
+												<span
+													class="event-cal-badge"
+													style="background: var(--color-{event.calendar_colour})"
+													>{event.calendar_name}</span
+												>
+											{/if}
+											{#if event.isRecurring}
+												<span class="recurrence-badge" title="Recurring event">↻</span>
+											{/if}
+										</div>
+										<Textarea
+											bind:value={event.text}
+											onchange={() => editEventText(event, event.text || '')}
+											style="width: 100%"
+										></Textarea>
+										{#if event.isRecurring}
+											<div class="event-actions">
+												<button
+													type="button"
+													class="action-link danger"
+													onclick={() => deleteThisEvent(event)}>Delete this</button
+												>
+												<button
+													type="button"
+													class="action-link danger"
+													onclick={() => deleteThisAndFuture(event)}>Delete future</button
+												>
+											</div>
+										{/if}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="no-events">No events — add one below.</p>
+					{/if}
+				</section>
 
-<!-- Day dialog -->
-<dialog bind:this={dialog} closedby="any">
-	<Toast />
-
-	<div class="dialog-header">
-		{#if selectedDate}
-			<h2 class="dialog-date">{formatDialogDate(selectedDate)}</h2>
-		{/if}
-		<button class="dialog-close" onclick={hideDialog} aria-label="Close">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-			</svg>
-		</button>
-	</div>
-
-	<section class="events">
-		{#if selectedDateEvents.length}
-			<ul>
-				{#each selectedDateEvents as event (event.isRecurring ? `${event.recurrenceGroupId}:${event.datetime}` : event.id)}
-					<li animate:flip>
-						<div class="event-input">
-							<div class="event-meta">
-								{#if event.calendar_colour}
-									<span class="event-cal-badge" style="background: var(--color-{event.calendar_colour})">{event.calendar_name}</span>
-								{/if}
-								{#if event.isRecurring}
-									<span class="recurrence-badge" title="Recurring event">↻</span>
-								{/if}
-							</div>
-							<Textarea
-								bind:value={event.text}
-								onchange={() => editEventText(event, event.text || '')}
-								style="width: 100%"
-							></Textarea>
-							{#if event.isRecurring}
-								<div class="event-actions">
-									<button type="button" class="action-link danger" onclick={() => deleteThisEvent(event)}>Delete this</button>
-									<button type="button" class="action-link danger" onclick={() => deleteThisAndFuture(event)}>Delete future</button>
-								</div>
+				<section class="new-event">
+					{#if calendars.length > 1}
+						<div class="cal-picker">
+							{#each calendars as cal (cal.id)}
+								<button
+									type="button"
+									class="cal-pick-btn"
+									class:active={effectiveCalendarId === cal.id}
+									onclick={() => (newEventCalendarId = cal.id)}
+									style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})"
+								>
+									<span class="chip-dot"></span>{cal.name}
+								</button>
+							{/each}
+						</div>
+					{/if}
+					<form
+						onsubmit={(e) => {
+							e.preventDefault();
+							createEvent(selectedDate, editingText);
+							editingText = '';
+						}}
+					>
+						<Textarea
+							bind:value={editingText}
+							placeholder="Add event…"
+							style="width: 100%"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' && e.metaKey) {
+									e.preventDefault();
+									createEvent(selectedDate, editingText);
+									editingText = '';
+								}
+							}}
+						></Textarea>
+						<div class="repeat-row">
+							<label class="repeat-label" for="repeat-select">Repeat</label>
+							<select id="repeat-select" class="repeat-select" bind:value={newEventRepeat}>
+								<option value="">No repeat</option>
+								<option value="daily">Daily</option>
+								<option value="weekly">Weekly</option>
+								<option value="fortnightly">Fortnightly</option>
+								<option value="monthly">Monthly</option>
+								<option value="yearly">Yearly</option>
+							</select>
+							{#if newEventRepeat}
+								<label class="repeat-label" for="ends-on-input">Ends</label>
+								<input
+									id="ends-on-input"
+									type="date"
+									class="ends-on-input"
+									bind:value={newEventEndsOn}
+									placeholder="No end"
+								/>
 							{/if}
 						</div>
-					</li>
-				{/each}
-			</ul>
-		{:else}
-			<p class="no-events">No events — add one below.</p>
-		{/if}
-	</section>
-
-	<section class="new-event">
-		{#if calendars.length > 1}
-			<div class="cal-picker">
-				{#each calendars as cal (cal.id)}
-					<button
-						type="button"
-						class="cal-pick-btn"
-						class:active={effectiveCalendarId === cal.id}
-						onclick={() => (newEventCalendarId = cal.id)}
-						style="--chip-color: var(--color-{cal.colour ?? 'text-muted'})"
-					>
-						<span class="chip-dot"></span>{cal.name}
-					</button>
-				{/each}
+						<div class="actions">
+							<Button type="submit" disabled={!editingText.length || calendars.length === 0}
+								>Add</Button
+							>
+						</div>
+					</form>
+				</section>
 			</div>
-		{/if}
-		<form
-			onsubmit={(e) => {
-				e.preventDefault();
-				if (selectedDate) createEvent(selectedDate, editingText);
-				editingText = '';
-			}}
-		>
-			<Textarea
-				bind:value={editingText}
-				placeholder="Add event…"
-				style="width: 100%"
-				onkeydown={(e) => {
-					if (e.key === 'Enter' && e.metaKey) {
-						e.preventDefault();
-						if (selectedDate) createEvent(selectedDate, editingText);
-						editingText = '';
-					}
-				}}
-			></Textarea>
-			<div class="repeat-row">
-				<label class="repeat-label" for="repeat-select">Repeat</label>
-				<select id="repeat-select" class="repeat-select" bind:value={newEventRepeat}>
-					<option value="">No repeat</option>
-					<option value="daily">Daily</option>
-					<option value="weekly">Weekly</option>
-					<option value="fortnightly">Fortnightly</option>
-					<option value="monthly">Monthly</option>
-					<option value="yearly">Yearly</option>
-				</select>
-				{#if newEventRepeat}
-					<label class="repeat-label" for="ends-on-input">Ends</label>
-					<input id="ends-on-input" type="date" class="ends-on-input" bind:value={newEventEndsOn} placeholder="No end" />
-				{/if}
-			</div>
-			<div class="actions">
-				<Button type="submit" disabled={!editingText.length || calendars.length === 0}>Add</Button>
-			</div>
-		</form>
-	</section>
-</dialog>
+		</div>
+	</div>
+</div>
 
 <style>
 	.calendar-wrapper {
@@ -352,7 +407,9 @@
 			flex: none;
 		}
 
-		&.dimmed { opacity: 0.35; }
+		&.dimmed {
+			opacity: 0.35;
+		}
 	}
 
 	.add-cal-btn {
@@ -373,6 +430,52 @@
 			color: var(--color-text);
 			border-color: var(--color-border-strong);
 		}
+	}
+
+	/* ---- Create calendar ---- */
+	.create-calendar {
+		flex: none;
+		padding: var(--space-2) var(--space-4);
+		border-bottom: 1px solid var(--color-border-subtle);
+
+		form {
+			display: flex;
+			align-items: center;
+			gap: var(--space-2);
+
+			input[type='text'] {
+				flex: 1;
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius-sm);
+				padding: var(--space-1) var(--space-2);
+				font-size: var(--font-size-sm);
+				font-family: var(--font-body);
+				background: var(--color-surface);
+				color: var(--color-text);
+				outline: none;
+				&:focus {
+					border-color: var(--color-accent);
+				}
+			}
+		}
+	}
+
+	/* ---- Split area ---- */
+	.split-area {
+		flex: auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* ---- Top panel: scrollable months ---- */
+	.top-panel {
+		flex: 1;
+		min-height: 0;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 	}
 
 	.no-calendars {
@@ -398,37 +501,10 @@
 		}
 	}
 
-	/* ---- Create calendar ---- */
-	.create-calendar {
-		flex: none;
-		padding: var(--space-2) var(--space-4);
-		border-bottom: 1px solid var(--color-border-subtle);
-
-		form {
-			display: flex;
-			align-items: center;
-			gap: var(--space-2);
-
-			input[type='text'] {
-				flex: 1;
-				border: 1px solid var(--color-border);
-				border-radius: var(--radius-sm);
-				padding: var(--space-1) var(--space-2);
-				font-size: var(--font-size-sm);
-				font-family: var(--font-body);
-				background: var(--color-surface);
-				color: var(--color-text);
-				outline: none;
-				&:focus { border-color: var(--color-accent); }
-			}
-		}
-	}
-
-	/* ---- Scrollable months ---- */
 	.scroll-area {
-		flex: 1;
+		flex: auto;
 		overflow-y: auto;
-		padding-bottom: var(--space-8);
+		padding-bottom: var(--space-4);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
@@ -437,7 +513,7 @@
 	/* ---- Back to today FAB ---- */
 	.today-fab {
 		position: absolute;
-		bottom: var(--space-6);
+		bottom: var(--space-4);
 		left: 50%;
 		transform: translateX(-50%);
 		background: var(--color-accent);
@@ -452,52 +528,37 @@
 		box-shadow: var(--shadow-lg);
 		transition: background var(--duration-fast) var(--ease-standard);
 		pointer-events: auto;
+		z-index: var(--z-sticky);
 
-		&:active { background: color-mix(in srgb, var(--color-accent) 85%, black); }
+		&:active {
+			background: color-mix(in srgb, var(--color-accent) 85%, var(--color-primary));
+		}
 	}
 
-	/* ---- Dialog ---- */
-	dialog {
-		padding: 0;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		background: var(--color-surface);
-		color: var(--color-text);
-		width: calc(min(90vw, 520px));
-		box-shadow: var(--shadow-xl);
-	}
-
-	.dialog-header {
+	/* ---- Bottom panel: selected date events ---- */
+	.bottom-panel {
+		flex: 1;
+		min-height: 0;
+		border-top: 2px solid var(--color-border);
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: var(--space-4) var(--space-4) var(--space-3);
+		flex-direction: column;
+	}
+
+	.panel-header {
+		flex: none;
+		padding: var(--space-3) var(--space-4) var(--space-2);
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
-	.dialog-date {
+	.panel-date {
 		font-size: var(--font-size-md);
 		font-family: var(--font-heading);
 		font-weight: var(--font-weight-bold);
 	}
 
-	.dialog-close {
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--color-text-muted);
-		display: flex;
-		align-items: center;
-		padding: var(--space-1);
-		border-radius: var(--radius-sm);
-		transition: color var(--duration-fast) var(--ease-standard);
-
-		&:hover { color: var(--color-text); }
-
-		svg {
-			width: var(--space-5);
-			height: var(--space-5);
-		}
+	.panel-body {
+		flex: auto;
+		overflow-y: auto;
 	}
 
 	.events {
@@ -550,7 +611,10 @@
 		gap: var(--space-1);
 	}
 
-	.event-actions { display: flex; gap: var(--space-3); }
+	.event-actions {
+		display: flex;
+		gap: var(--space-3);
+	}
 
 	.action-link {
 		background: none;
@@ -563,8 +627,12 @@
 		text-decoration: underline;
 		text-underline-offset: 2px;
 
-		&:hover { color: var(--color-text); }
-		&.danger:hover { color: var(--color-danger); }
+		&:hover {
+			color: var(--color-text);
+		}
+		&.danger:hover {
+			color: var(--color-danger);
+		}
 	}
 
 	.cal-picker {
@@ -638,6 +706,8 @@
 		padding: 2px var(--space-2);
 		outline: none;
 
-		&:focus { border-color: var(--color-accent); }
+		&:focus {
+			border-color: var(--color-accent);
+		}
 	}
 </style>
