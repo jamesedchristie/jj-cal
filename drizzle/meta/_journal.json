@@ -113,6 +113,20 @@
       "when": 1745020800000,
       "tag": "0015_flat_recurring_events",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1745107200000,
+      "tag": "0016_list_sort_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1745193600000,
+      "tag": "0017_budgeting",
+      "breakpoints": true
     }
   ]
 }

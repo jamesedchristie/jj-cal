@@ -138,6 +138,51 @@ export const listItemsTable = sqliteTable('list_item', {
 	recurrenceInterval: text('recurrence_interval', { enum: RECURRENCE_INTERVALS })
 });
 
+// Budgeting feature
+
+export const BUDGET_ITEM_TYPES = ['incoming', 'outgoing', 'allocation', 'savings'] as const;
+export type BudgetItemType = (typeof BUDGET_ITEM_TYPES)[number];
+
+export const BUDGET_FREQUENCIES = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'] as const;
+export type BudgetFrequency = (typeof BUDGET_FREQUENCIES)[number];
+
+export const budgetsTable = sqliteTable('budget', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	createdById: text('created_by_id').notNull().references(() => usersTable.id),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+});
+
+export const budgetItemsTable = sqliteTable('budget_item', {
+	id: text('id').primaryKey(),
+	budgetId: text('budget_id')
+		.notNull()
+		.references(() => budgetsTable.id, { onDelete: 'cascade' }),
+	name: text('name').notNull(),
+	type: text('type', { enum: BUDGET_ITEM_TYPES }).notNull(),
+	// Amount stored in cents to avoid floating-point issues
+	amount: integer('amount').notNull(),
+	frequency: text('frequency', { enum: BUDGET_FREQUENCIES }).notNull(),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+});
+
+export const expensesTable = sqliteTable('expense', {
+	id: text('id').primaryKey(),
+	budgetId: text('budget_id')
+		.notNull()
+		.references(() => budgetsTable.id, { onDelete: 'cascade' }),
+	// Amount stored in cents
+	amount: integer('amount').notNull(),
+	description: text('description').notNull(),
+	// ISO date string YYYY-MM-DD — date only, no time component
+	date: text('date').notNull(),
+	// null means "Other" (no matching allocation)
+	categoryId: text('category_id').references(() => budgetItemsTable.id, { onDelete: 'set null' }),
+	createdById: text('created_by_id').notNull().references(() => usersTable.id),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+});
+
 // jj-cal-p8qn: resource sharing & ACL model
 
 export const RESOURCE_TYPES = ['list', 'calendar'] as const;
