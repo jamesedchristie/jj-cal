@@ -1,11 +1,16 @@
 import { and, asc, count, desc, eq, gte, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { type DrizzleClient } from '.';
 import {
+	budgetItemsTable,
+	budgetsTable,
 	calendarsTable,
 	eventsTable,
+	expensesTable,
 	invitesTable,
 	listItemsTable,
 	listsTable,
+	type BudgetFrequency,
+	type BudgetItemType,
 	type EventRecurrenceRule,
 	type ListType,
 	type Permission,
@@ -649,4 +654,79 @@ export async function getTaskItemsForUser(
 		.orderBy(asc(listItemsTable.sortOrder), asc(listItemsTable.createdAt));
 
 	return rows.map((item) => ({ ...item, listName: listNameMap.get(item.listId) ?? '' }));
+}
+
+// ---------------------------------------------------------------------------
+// Budget
+// ---------------------------------------------------------------------------
+
+/** Returns the single household budget, creating it on first call. */
+export async function getOrCreateHouseholdBudget(db: DrizzleClient, userId: string) {
+	const existing = await db.select().from(budgetsTable).limit(1);
+	if (existing[0]) return existing[0];
+	const rows = await db
+		.insert(budgetsTable)
+		.values({ id: crypto.randomUUID(), name: 'Family Budget', createdById: userId, createdAt: new Date() })
+		.returning();
+	return rows[0];
+}
+
+export async function getBudgetItemsForBudget(db: DrizzleClient, budgetId: string) {
+	return db
+		.select()
+		.from(budgetItemsTable)
+		.where(eq(budgetItemsTable.budgetId, budgetId))
+		.orderBy(asc(budgetItemsTable.sortOrder), asc(budgetItemsTable.createdAt));
+}
+
+export async function createBudgetItem(
+	db: DrizzleClient,
+	input: {
+		budgetId: string;
+		name: string;
+		type: BudgetItemType;
+		amount: number;
+		frequency: BudgetFrequency;
+		sortOrder: number;
+	}
+) {
+	const rows = await db
+		.insert(budgetItemsTable)
+		.values({ id: crypto.randomUUID(), ...input, createdAt: new Date() })
+		.returning();
+	return rows[0];
+}
+
+export async function deleteBudgetItem(db: DrizzleClient, id: string) {
+	await db.delete(budgetItemsTable).where(eq(budgetItemsTable.id, id));
+}
+
+export async function getExpensesForBudget(db: DrizzleClient, budgetId: string) {
+	return db
+		.select()
+		.from(expensesTable)
+		.where(eq(expensesTable.budgetId, budgetId))
+		.orderBy(desc(expensesTable.date), desc(expensesTable.createdAt));
+}
+
+export async function createExpense(
+	db: DrizzleClient,
+	input: {
+		budgetId: string;
+		amount: number;
+		description: string;
+		date: string;
+		categoryId: string | null;
+		createdById: string;
+	}
+) {
+	const rows = await db
+		.insert(expensesTable)
+		.values({ id: crypto.randomUUID(), ...input, createdAt: new Date() })
+		.returning();
+	return rows[0];
+}
+
+export async function deleteExpense(db: DrizzleClient, id: string) {
+	await db.delete(expensesTable).where(eq(expensesTable.id, id));
 }
