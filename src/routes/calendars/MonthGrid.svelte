@@ -10,10 +10,11 @@
 		todayM: number;
 		todayD: number;
 		hiddenCalendarIds: Set<number>;
-		onDateClick: (date: Date, events: CalendarEvent[]) => void;
+		selectedDate?: Date | null;
+		onDateClick: (date: Date) => void;
 	}
 
-	let { year, month, todayY, todayM, todayD, hiddenCalendarIds, onDateClick }: Props = $props();
+	let { year, month, todayY, todayM, todayD, hiddenCalendarIds, selectedDate = null, onDateClick }: Props = $props();
 
 	// Load lazily once visible
 	let visible = $state(false);
@@ -73,6 +74,10 @@
 	function eventsForDay(date: Date) {
 		return events.filter((e) => isSameDay(e.datetime, date));
 	}
+
+	function isSelected(date: Date) {
+		return selectedDate != null && isSameDay(date.getTime(), selectedDate);
+	}
 </script>
 
 <section id="month-{year}-{String(month).padStart(2, '0')}" class="month-section" {@attach observeOnce(() => (visible = true))}>
@@ -95,7 +100,8 @@
 						class="day"
 						class:other-month={otherMonth}
 						class:today={isToday(date)}
-						onclick={() => onDateClick(date, dayEvents)}
+						class:selected={isSelected(date)}
+						onclick={() => onDateClick(date)}
 					>
 						<span class="date-num">{date.getDate()}</span>
 						<EventsList events={dayEvents} />
@@ -176,6 +182,15 @@
 
 		&:hover {
 			background: color-mix(in srgb, var(--color-text) 5%, transparent);
+		}
+
+		&.selected:not(.today) {
+			background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+
+			.date-num {
+				color: var(--color-accent);
+				font-weight: var(--font-weight-semibold);
+			}
 		}
 
 		&.other-month {
